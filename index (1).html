@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AÏCHOLA MÉDIA – Plateforme de Formation</title> 
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=Raleway:wght@300;400;500;600;700&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<!-- Firebase (base de données en ligne) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading">
+  <div class="loader-ring"></div>
+  <div class="loader-text">AÏCHOLA MÉDIA</div>
+</div>
+
+<!-- BG -->
+<div class="bg-decor"><div class="c1"></div><div class="c2"></div><div class="grid"></div></div>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <div>
+    <div class="topbar-brand">AÏCHOLA <span>MÉDIA</span></div>
+    <div class="topbar-sub" id="topbar-sub">Centre de Formation Professionnelle</div>
+  </div>
+  <div class="topbar-nav">
+    <button class="lang-btn active" onclick="setLang('fr')" id="btn-fr">FR</button>
+    <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+    <button class="btn-logout hidden" id="btn-logout-top" onclick="logout()">
+      <span id="t-logout">Déconnexion</span>
+    </button>
+  </div>
+  <div class="topbar-stripe"></div>
+</nav>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="toast-icon" id="toast-icon">✅</div>
+  <div class="toast-text"><strong id="toast-title"></strong><span id="toast-msg"></span></div>
+</div>
+
+<!-- ═══════ PAGE LOGIN ═══════ -->
+<div class="page" id="page-login">
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="login-icon">🎓</div>
+      <div class="login-title" id="t-login-title">Connexion</div>
+      <div class="login-sub" id="t-login-sub">Accédez à votre espace formation</div>
+      <div class="tab-switch">
+        <button class="tab-btn active" id="tab-student" onclick="switchTab('student')">Étudiant</button>
+        <button class="tab-btn" id="tab-admin" onclick="switchTab('admin')" style="display:none;">Administrateur</button>
+      </div>
+      <div id="error-login" class="error-msg"></div>
+      <div class="form-group">
+        <label class="form-label" id="t-email-lbl">Email</label>
+        <input type="email" class="form-input" id="login-email" placeholder="votre@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label" id="t-pass-lbl">Mot de passe</label>
+        <input type="password" class="form-input" id="login-pass" placeholder="••••••••">
+      </div>
+      <button class="btn-primary" onclick="doLogin()" id="t-login-btn">SE CONNECTER</button>
+      <div class="form-switch" id="student-switch">
+        <span id="t-no-account">Pas encore de compte ?</span>
+        <a onclick="showPage('register')" id="t-register-link"> S'inscrire</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE REGISTER ═══════ -->
+<div class="page" id="page-register">
+  <div class="register-card">
+    <div class="register-title" id="t-reg-title">Inscription à la Formation</div>
+    <div class="register-sub" id="t-reg-sub">Créez votre compte étudiant · Une semaine intensive</div>
+    <div id="error-register" class="error-msg"></div>
+    <div class="form-grid">
+      <div class="full">
+        <label class="form-label" id="t-photo-lbl">Photo de profil</label>
+        <div class="photo-upload-area" id="photo-area">
+          <img class="photo-preview" id="photo-preview" src="" alt="">
+          <div id="photo-placeholder">
+            <div class="photo-upload-icon">📷</div>
+            <div class="photo-upload-text">
+              <strong id="t-click-upload">Cliquer pour télécharger</strong><br>
+              <span id="t-photo-hint">JPG, PNG — max 5MB</span>
+            </div>
+          </div>
+          <input type="file" id="photo-file" accept="image/*" onchange="previewPhoto(event)">
+        </div>
+      </div>
+      <div>
+        <label class="form-label" id="t-prenom">Prénom <span style="color:#e74c3c;">*</span></label>
+        <input type="text" class="form-input" id="reg-prenom" placeholder="Jean" oninput="clearFieldError('err-prenom')">
+        <div class="field-error" id="err-prenom"></div>
+      </div>
+      <div>
+        <label class="form-label" id="t-nom">Nom <span style="color:#e74c3c;">*</span></label>
+        <input type="text" class="form-input" id="reg-nom" placeholder="Dupont" oninput="clearFieldError('err-nom')">
+        <div class="field-error" id="err-nom"></div>
+      </div>
+      <div class="full">
+        <label class="form-label" id="t-reg-email">Email <span style="color:#e74c3c;">*</span></label>
+        <input type="text" class="form-input" id="reg-email" placeholder="jean@email.com" oninput="clearFieldError('err-email')">
+        <div class="field-error" id="err-email"></div>
+      </div>
+      <div>
+        <label class="form-label" id="t-tel">Téléphone <span style="color:#e74c3c;">*</span></label>
+        <input type="text" class="form-input" id="reg-tel" placeholder="71 12 65 93" maxlength="11" oninput="formatTel(this); clearFieldError('err-tel')">
+        <div class="field-error" id="err-tel"></div>
+      </div>
+      <div>
+        <label class="form-label" id="t-niveau">Niveau d'étude <span style="color:#e74c3c;">*</span></label>
+        <select class="form-input" id="reg-niveau" onchange="clearFieldError('err-niveau')">
+          <option value="">-- Choisir --</option>
+          <option value="Collège">Collège</option>
+          <option value="Lycée">Lycée</option>
+          <option value="Licence">Licence</option>
+          <option value="Master">Master</option>
+          <option value="Doctorat">Doctorat</option>
+          <option value="Autre">Autre</option>
+        </select>
+        <div class="field-error" id="err-niveau"></div>
+      </div>
+      <div class="full">
+        <label class="form-label" id="t-adresse">Adresse <span style="color:#e74c3c;">*</span></label>
+        <input type="text" class="form-input" id="reg-adresse" placeholder="Quartier, Ville" oninput="clearFieldError('err-adresse')">
+        <div class="field-error" id="err-adresse"></div>
+      </div>
+      <div>
+        <label class="form-label" id="t-reg-pass">Mot de passe <span style="color:#e74c3c;">*</span></label>
+        <div style="position:relative;">
+          <input type="password" class="form-input" id="reg-pass" placeholder="Min. 8 car. · 1 majuscule · 1 chiffre" oninput="checkPassStrength(); clearFieldError('err-pass')">
+          <button type="button" onclick="togglePass('reg-pass','eye-pass')" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);" id="eye-pass">👁</button>
+        </div>
+        <div class="pass-strength-bar" id="pass-strength-bar"><div id="pass-strength-fill"></div></div>
+        <div class="pass-strength-txt" id="pass-strength-txt"></div>
+        <div class="field-error" id="err-pass"></div>
+      </div>
+      <div>
+        <label class="form-label">Confirmer mot de passe <span style="color:#e74c3c;">*</span></label>
+        <div style="position:relative;">
+          <input type="password" class="form-input" id="reg-pass2" placeholder="Répétez le mot de passe" oninput="clearFieldError('err-pass2')">
+          <button type="button" onclick="togglePass('reg-pass2','eye-pass2')" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);" id="eye-pass2">👁</button>
+        </div>
+        <div class="field-error" id="err-pass2"></div>
+      </div>
+    </div>
+    <br>
+    <button class="btn-primary" onclick="doRegister()" id="t-reg-btn">CRÉER MON COMPTE</button>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-muted);text-align:center;">
+      <span style="color:#e74c3c;">*</span> Champs obligatoires
+    </div>
+    <div class="form-switch" style="margin-top:16px;">
+      <span id="t-have-account">Déjà un compte ?</span>
+      <a onclick="showPage('login')" id="t-login-link"> Se connecter</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE EN ATTENTE D'ACTIVATION ═══════ -->
+<div class="page" id="page-waiting">
+  <div style="display:flex; align-items:center; justify-content:center; min-height:calc(100vh - 68px); padding:20px;">
+  <div style="width:100%; max-width:480px; background:rgba(13,13,26,0.9); border:1px solid rgba(212,175,55,0.2); border-radius:20px; padding:44px 40px; backdrop-filter:blur(20px); box-shadow:0 30px 80px rgba(0,0,0,0.5); text-align:center; position:relative; overflow:hidden; animation: fadeUp 0.6s ease;">
+    <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#b8860b,#f5e17a,#b8860b);"></div>
+
+    <!-- Chronomètre 24h -->
+    <div style="margin:0 auto 24px; text-align:center;">
+      <div style="font-family:'Montserrat',sans-serif; font-size:11px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:rgba(212,175,55,0.6); margin-bottom:10px;">Délai de vérification</div>
+      <div id="waiting-countdown" style="font-family:'Montserrat',sans-serif; font-size:42px; font-weight:800; color:var(--gold); letter-spacing:2px; line-height:1;">24:00:00</div>
+      <div style="font-size:10px; color:rgba(255,255,255,0.3); margin-top:6px; letter-spacing:1px;">HEURES · MINUTES · SECONDES</div>
+    </div>
+
+    <div style="font-family:'Playfair Display',serif; font-size:24px; font-weight:700; margin-bottom:10px;">
+      ⏳ En attente d'activation
+    </div>
+    <div style="color:rgba(255,255,255,0.55); font-size:14px; line-height:1.7; margin-bottom:28px;">
+      Votre paiement a bien été enregistré.<br>
+      <strong style="color:var(--gold);">L'administrateur doit activer votre compte</strong> avant que vous puissiez accéder à votre espace étudiant.<br><br>
+      Une fois votre preuve de paiement vérifiée, votre accès sera débloqué.
+    </div>
+
+    <!-- Infos du compte -->
+    <div style="background:rgba(212,175,55,0.06); border:1px solid rgba(212,175,55,0.15); border-radius:12px; padding:16px 20px; margin-bottom:24px; text-align:left;">
+      <div style="font-size:10px; letter-spacing:2px; text-transform:uppercase; color:rgba(212,175,55,0.6); margin-bottom:10px; font-family:'Montserrat',sans-serif; font-weight:700;">Votre compte</div>
+      <div style="font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:6px;">👤 <span id="waiting-name">—</span></div>
+      <div style="font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:6px;">📧 <span id="waiting-email">—</span></div>
+      <div style="font-size:13px; color:rgba(255,255,255,0.7);">🔖 Réf : <span id="waiting-ref" style="color:var(--gold); font-family:'Montserrat',sans-serif; font-weight:700;">—</span></div>
+    </div>
+
+    <!-- Bouton WhatsApp pour relancer -->
+    <a id="whatsapp-waiting-btn" href="#" target="_blank" onclick="return openWhatsApp()"
+      style="display:block; width:100%; padding:14px; border-radius:12px;
+      background:linear-gradient(135deg,#128C7E,#25D366); color:white; font-family:'Montserrat',sans-serif;
+      font-size:12px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase;
+      box-shadow:0 8px 25px rgba(37,211,102,0.3); text-align:center; text-decoration:none;
+      margin-bottom:12px; box-sizing:border-box;">
+      📲 ENVOYER MA CAPTURE SUR WHATSAPP
+    </a>
+
+    <button onclick="checkActivationStatus()" style="width:100%; padding:13px; background:rgba(212,175,55,0.1); border:1px solid rgba(212,175,55,0.3); border-radius:12px; color:var(--gold); font-family:'Montserrat',sans-serif; font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:all 0.3s; margin-bottom:12px;" onmouseover="this.style.background='rgba(212,175,55,0.2)'" onmouseout="this.style.background='rgba(212,175,55,0.1)'">
+      🔄 VÉRIFIER MON ACCÈS
+    </button>
+
+    <button onclick="logout()" style="background:none; border:none; color:rgba(255,255,255,0.4); font-size:12px; cursor:pointer; font-family:'Raleway',sans-serif; text-decoration:underline;">
+      Se déconnecter
+    </button>
+
+    <div style="margin-top:20px; font-size:11px; color:rgba(255,255,255,0.3);">
+      Pour toute question : <strong style="color:rgba(212,175,55,0.6);">+228 71 12 65 93</strong>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE PAIEMENT ═══════ -->
+<div class="page" id="page-payment">
+  <div style="width:100%; display:flex; justify-content:center; align-items:flex-start; padding: 20px;">
+  <div class="payment-page-card">
+
+    <!-- Étapes -->
+    <div class="pay-steps">
+      <div class="pay-step">
+        <div class="pay-step-dot done" id="step-dot-1">✓</div>
+        <div class="pay-step-label" id="step-lbl-1">Inscription</div>
+      </div>
+      <div class="pay-step-line done" id="step-line-1"></div>
+      <div class="pay-step">
+        <div class="pay-step-dot active" id="step-dot-2">2</div>
+        <div class="pay-step-label active" id="step-lbl-2">Paiement</div>
+      </div>
+      <div class="pay-step-line" id="step-line-2"></div>
+      <div class="pay-step">
+        <div class="pay-step-dot pending" id="step-dot-3">3</div>
+        <div class="pay-step-label" id="step-lbl-3">Espace étudiant</div>
+      </div>
+    </div>
+
+    <!-- Contenu principal (sélection méthode) -->
+    <div id="pay-main">
+      <div class="pay-title" id="t-pay-title">Frais d'inscription</div>
+      <div class="pay-sub" id="t-pay-subtitle">Réglez vos frais pour accéder à la formation</div>
+
+      <!-- Montant -->
+      <div class="pay-amount-box" id="pay-amount-box">
+        <div>
+          <div class="pay-amount-label" id="t-pay-amount-lbl">Montant à payer</div>
+          <div class="pay-amount-val" id="pay-amount-display">10 000 F</div>
+          <div class="pay-amount-sub" id="t-pay-amount-sub">Frais d'inscription · AÏCHOLA MÉDIA</div>
+        </div>
+        <div class="pay-amount-icon">💰</div>
+      </div>
+
+      <!-- Choix méthode -->
+      <div style="font-size:11px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; font-family:'Montserrat',sans-serif; font-weight:700;" id="t-choose-method">Choisir la méthode de paiement</div>
+      <div class="pay-method-grid">
+        <div class="pay-method-btn yas-btn" id="pm-btn-yas" onclick="chooseMethod('yas')">
+          <div class="pay-selected-tick" id="tick-yas">✓</div>
+          <div class="pay-method-badge">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Yas_logo_2024.svg/200px-Yas_logo_2024.svg.png"
+              alt="YAS Togo"
+              style="width:64px; height:64px; object-fit:contain; border-radius:12px;"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <span style="display:none; font-size:28px;">📱</span>
+          </div>
+          <div class="pay-method-name">YAS TOGO</div>
+          <div class="pay-method-tag" id="t-yas-tag">Mobile Money</div>
+        </div>
+        <div class="pay-method-btn moov-btn" id="pm-btn-moov" onclick="chooseMethod('moov')">
+          <div class="pay-selected-tick" id="tick-moov">✓</div>
+          <div class="pay-method-badge">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Moov_Africa_logo.svg/200px-Moov_Africa_logo.svg.png"
+              alt="Moov Africa"
+              style="width:64px; height:64px; object-fit:contain; border-radius:12px;"
+              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <span style="display:none; font-size:28px;">💳</span>
+          </div>
+          <div class="pay-method-name">MOOV MONEY</div>
+          <div class="pay-method-tag" id="t-moov-tag">Mobile Money</div>
+        </div>
+      </div>
+
+      <!-- Détails YAS -->
+      <div class="pay-detail-box yas-detail" id="detail-yas">
+        <div class="pay-detail-title" style="display:flex; align-items:center; gap:12px;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Yas_logo_2024.svg/200px-Yas_logo_2024.svg.png"
+            alt="YAS" style="width:40px; height:40px; object-fit:contain; border-radius:8px; background:#fff; padding:4px;"
+            onerror="this.style.display='none'">
+          Instructions – YAS TOGO
+        </div>
+        <div class="pay-detail-row">
+          <span class="lbl" id="t-yas-num-lbl">Numéro marchand</span>
+          <span class="val pay-phone-big">+228 71 12 65 93</span>
+        </div>
+        <div class="pay-detail-row">
+          <span class="lbl" id="t-ref-lbl">Référence</span>
+          <span class="val pay-ref-code" id="ref-display-yas">—</span>
+        </div>
+        <div class="pay-ussd-box">
+          <div class="pay-ussd-label">Code USSD direct YAS TOGO</div>
+          <div class="pay-ussd-code" id="yas-ussd-display">*145*1*10000*7977137 2*CodeSecret#</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:6px;">Remplacez <strong style="color:#4da6ff;">CodeSecret</strong> par votre code PIN YAS</div>
+        </div>
+        <div class="pay-instructions">
+          <div class="pay-instruction-step"><div class="pay-instruction-num">1</div><span id="t-yas-step1">Composez le code USSD ci-dessus <strong>directement sur votre téléphone</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">2</div><span id="t-yas-step2">Format : <strong>*145*1*Montant*Numéro_bénéficiaire*Code_secret#</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">3</div><span id="t-yas-step3">Bénéficiaire : <strong>71 12 65 93</strong> · Montant : <strong>10 000 F</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">4</div><span id="t-yas-step4">Confirmez avec votre <strong>code PIN YAS</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">5</div><span id="t-yas-step5">Envoyez la <strong>capture d'écran</strong> sur WhatsApp, puis cliquez « J'ai payé »</span></div>
+        </div>
+        <div class="form-group" style="margin-top:16px; margin-bottom:0;">
+          <label class="form-label" id="t-yas-phone-lbl">Votre numéro YAS (pour vérification)</label>
+          <div class="pay-phone-input-wrap">
+            <span class="pay-phone-prefix">+228</span>
+            <input type="tel" class="form-input pay-phone-input" id="input-phone-yas" placeholder="79 00 00 00" maxlength="10">
+          </div>
+        </div>
+        <button class="btn-pay-yas" id="btn-pay-yas" onclick="initiatePay('yas')">
+          📱 J'AI PAYÉ VIA YAS TOGO
+        </button>
+        <a id="whatsapp-btn-yas" href="#" target="_blank" onclick="return openWhatsApp()" style="display:none; width:100%; padding:14px; border:none; border-radius:12px; background:linear-gradient(135deg,#128C7E,#25D366); color:white; font-family:'Montserrat',sans-serif; font-size:12px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:all 0.3s; box-shadow:0 8px 25px rgba(37,211,102,0.3); text-align:center; text-decoration:none; margin-top:10px; box-sizing:border-box; align-items:center; justify-content:center; gap:8px;">
+          📲 ENVOYER LA CAPTURE SUR WHATSAPP
+        </a>
+      </div>
+
+      <!-- Détails MOOV -->
+      <div class="pay-detail-box moov-detail" id="detail-moov">
+        <div class="pay-detail-title" style="display:flex; align-items:center; gap:12px;">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Moov_Africa_logo.svg/200px-Moov_Africa_logo.svg.png"
+            alt="Moov" style="width:40px; height:40px; object-fit:contain; border-radius:8px; background:#fff; padding:4px;"
+            onerror="this.style.display='none'">
+          Instructions – MOOV MONEY
+        </div>
+        <div class="pay-detail-row">
+          <span class="lbl" id="t-moov-num-lbl">Numéro marchand</span>
+          <span class="val pay-phone-big" style="color:#ffaa33;">+228 71 12 65 93</span>
+        </div>
+        <div class="pay-detail-row">
+          <span class="lbl" id="t-ref-lbl2">Référence</span>
+          <span class="val pay-ref-code" id="ref-display-moov">—</span>
+        </div>
+        <div class="pay-ussd-box">
+          <div class="pay-ussd-label">Code USSD direct MOOV TOGO</div>
+          <div class="pay-ussd-code" style="color:#ffaa33;" id="moov-ussd-display">*155*1*1*71126593*10000*CodeSecret#</div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:6px;">Remplacez <strong style="color:#ffaa33;">CodeSecret</strong> par votre code PIN MOOV</div>
+        </div>
+        <div class="pay-instructions">
+          <div class="pay-instruction-step"><div class="pay-instruction-num">1</div><span id="t-moov-step1">Composez le code USSD ci-dessus <strong>directement sur votre téléphone</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">2</div><span id="t-moov-step2">Format : <strong>*155*1*1*Numéro_bénéficiaire*Montant*Code_secret#</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">3</div><span id="t-moov-step3">Bénéficiaire : <strong>71 12 65 93</strong> · Montant : <strong>10 000 F</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">4</div><span id="t-moov-step4">Confirmez avec votre <strong>code PIN MOOV</strong></span></div>
+          <div class="pay-instruction-step"><div class="pay-instruction-num">5</div><span id="t-moov-step5">Envoyez la <strong>capture d'écran</strong> sur WhatsApp, puis cliquez « J'ai payé »</span></div>
+        </div>
+        <div class="form-group" style="margin-top:16px; margin-bottom:0;">
+          <label class="form-label" id="t-moov-phone-lbl">Votre numéro MOOV (pour vérification)</label>
+          <div class="pay-phone-input-wrap">
+            <span class="pay-phone-prefix">+228</span>
+            <input type="tel" class="form-input pay-phone-input" id="input-phone-moov" placeholder="90 00 00 00" maxlength="10">
+          </div>
+        </div>
+        <button class="btn-pay-moov" id="btn-pay-moov" onclick="initiatePay('moov')">
+          💳 J'AI PAYÉ VIA MOOV MONEY
+        </button>
+        <a id="whatsapp-btn-moov" href="#" target="_blank" onclick="return openWhatsApp()" style="display:none; width:100%; padding:14px; border:none; border-radius:12px; background:linear-gradient(135deg,#128C7E,#25D366); color:white; font-family:'Montserrat',sans-serif; font-size:12px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:all 0.3s; box-shadow:0 8px 25px rgba(37,211,102,0.3); text-align:center; text-decoration:none; margin-top:10px; box-sizing:border-box;">
+          📲 ENVOYER LA CAPTURE SUR WHATSAPP
+        </a>
+      </div>
+
+    </div><!-- /pay-main -->
+
+    <!-- État attente confirmation -->
+    <div class="pay-pending-state" id="pay-pending">
+      <div class="pay-spinner"></div>
+      <div class="pay-pending-title" id="t-pending-title">Vérification en cours...</div>
+      <div class="pay-pending-sub" id="t-pending-sub">
+        Nous vérifions votre paiement.<br>
+        Assurez-vous d'avoir reçu le SMS de confirmation de votre opérateur.
+      </div>
+      <div class="pay-pending-timer" id="pay-timer">00:30</div>
+      <div style="margin-top:12px; font-size:11px; color:var(--text-muted);" id="t-pending-ref">Réf : <span id="pending-ref-show">—</span></div>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE STUDENT DASHBOARD ═══════ -->
+<div class="page" id="page-student">
+  <div class="dash-container">
+
+    <div class="dash-welcome">
+      <div class="dash-avatar" id="student-avatar-wrap">
+        <img id="student-avatar" src="" alt="" style="display:none">
+        <span id="student-avatar-emoji">🎓</span>
+      </div>
+      <div class="dash-welcome-text">
+        <h2 id="t-welcome-name">Bienvenue !</h2>
+        <p id="t-welcome-sub">Formation professionnelle · AÏCHOLA MÉDIA</p>
+        <div style="margin-top:10px;">
+          <span class="status-badge confirmed">
+            <span class="status-dot"></span>
+            <span id="t-inscrit">Inscrit</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+
+      <!-- Infos perso -->
+      <div class="dash-card">
+        <div class="dash-card-title" id="t-my-info">Mes informations</div>
+        <div class="info-row-dash"><span class="lbl" id="t-d-email">Email</span><span class="val" id="d-email">—</span></div>
+        <div class="info-row-dash"><span class="lbl" id="t-d-tel">Téléphone</span><span class="val" id="d-tel">—</span></div>
+        <div class="info-row-dash"><span class="lbl" id="t-d-adresse">Adresse</span><span class="val" id="d-adresse">—</span></div>
+        <div class="info-row-dash"><span class="lbl" id="t-d-niveau">Niveau</span><span class="val" id="d-niveau">—</span></div>
+      </div>
+
+      <!-- Formation & Paiements -->
+      <div class="dash-card">
+        <div class="dash-card-title" id="t-my-formation">Ma formation & Paiements</div>
+        <div class="price-display">
+          <div class="price-item" id="card-inscription-status">
+            <div class="lbl" id="t-inscription-p">Inscription</div>
+            <div class="val">10 000 F</div>
+            <div class="status-txt" id="inscription-status-txt">—</div>
+          </div>
+          <div class="price-item" id="card-formation-status">
+            <div class="lbl" id="t-formation-p">Formation</div>
+            <div class="val">100 000 F</div>
+            <div class="status-txt" id="formation-status-txt">—</div>
+          </div>
+        </div>
+        <div style="margin-top:14px; padding:12px; background:rgba(212,175,55,0.05); border-radius:8px; border:1px solid rgba(212,175,55,0.1);">
+          <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;" id="t-duree-label">Durée</div>
+          <div style="font-weight:600; margin-top:4px;" id="t-duree-val">1 Semaine Intensive</div>
+        </div>
+        <!-- Bouton télécharger reçu inscription -->
+        <button class="btn-download-receipt hidden" id="btn-download-receipt-dash" onclick="downloadReceiptFromDash()">
+          📥 TÉLÉCHARGER MON REÇU
+        </button>
+        <!-- Bouton payer formation -->
+        <button class="btn-pay-formation hidden" id="btn-pay-formation-dash" onclick="goToPayFormation()">
+          💰 PAYER LA FORMATION (100 000 F)
+        </button>
+      </div>
+
+      <!-- Objectifs -->
+      <div class="dash-card full-width">
+        <div class="dash-card-title" id="t-obj-card">Programme de la formation</div>
+        <ul class="obj-list-dash" id="obj-list-student"></ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE RÉCAPITULATIF ═══════ -->
+<div class="page" id="page-summary">
+  <div class="summary-card">
+    <div class="summary-success-icon">✅</div>
+    <div class="summary-title" id="t-summary-title">Paiement réussi !</div>
+    <div class="summary-sub" id="t-summary-sub">Votre inscription est confirmée. Voici votre reçu.</div>
+
+    <div class="receipt-box">
+      <div class="receipt-header">
+        <div class="receipt-header-title">🧾 Reçu de paiement</div>
+        <div class="receipt-header-date" id="receipt-date">—</div>
+      </div>
+      <div class="receipt-row">
+        <span class="lbl">Étudiant</span>
+        <span class="val" id="receipt-name">—</span>
+      </div>
+      <div class="receipt-row">
+        <span class="lbl">Email</span>
+        <span class="val" id="receipt-email">—</span>
+      </div>
+      <div class="receipt-row">
+        <span class="lbl">Téléphone</span>
+        <span class="val" id="receipt-tel">—</span>
+      </div>
+      <div class="receipt-row">
+        <span class="lbl">Niveau</span>
+        <span class="val" id="receipt-niveau">—</span>
+      </div>
+      <div class="receipt-row" style="background: rgba(212,175,55,0.03);">
+        <span class="lbl">Montant payé</span>
+        <span class="val gold" id="receipt-amount">10 000 F</span>
+      </div>
+      <div class="receipt-row">
+        <span class="lbl">Type</span>
+        <span class="val" id="receipt-type">Frais d'inscription</span>
+      </div>
+      <div class="receipt-row">
+        <span class="lbl">Via</span>
+        <span class="val" id="receipt-method-badge">—</span>
+      </div>
+      <div class="receipt-row">
+        <span class="lbl">Référence</span>
+        <span class="val" style="font-family:'Montserrat',sans-serif; letter-spacing:1px; color:var(--gold);" id="receipt-ref">—</span>
+      </div>
+      <div class="receipt-row" style="background: rgba(46,204,113,0.04);">
+        <span class="lbl">Statut</span>
+        <span class="val green">✓ CONFIRMÉ</span>
+      </div>
+    </div>
+
+    <div class="summary-actions">
+      <button class="btn-dashboard" onclick="loadStudentDash(currentUser)">
+        🎓 ACCÉDER À MON ESPACE ÉTUDIANT
+      </button>
+      <button class="btn-download-receipt" onclick="downloadReceipt()">
+        ⬇ TÉLÉCHARGER LE REÇU (PDF)
+      </button>
+    </div>
+
+    <div class="summary-note">
+      Conservez ce reçu. Pour toute question, contactez-nous au<br>
+      <strong>+228 71 12 65 93</strong> (WhatsApp / Appel)
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE CHOIX TYPE DE COURS ═══════ -->
+<div class="page" id="page-course-choice">
+  <div style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:20px;">
+  <div style="width:100%;max-width:600px;">
+
+    <div style="text-align:center;margin-bottom:36px;">
+      <div style="font-family:'Playfair Display',serif;font-size:30px;font-weight:700;margin-bottom:10px;">
+        Choisissez votre <span style="color:var(--gold);">mode de formation</span>
+      </div>
+      <div style="color:rgba(255,255,255,0.5);font-size:14px;">Sélectionnez le type de cours qui vous convient</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+      <!-- Cours en ligne -->
+      <div onclick="selectCourseType('online')" style="cursor:pointer;background:rgba(13,13,26,0.9);border:2px solid rgba(212,175,55,0.2);border-radius:20px;padding:32px 24px;text-align:center;transition:all 0.3s;position:relative;overflow:hidden;"
+        onmouseover="this.style.borderColor='var(--gold)';this.style.transform='translateY(-4px)';this.style.boxShadow='0 20px 50px rgba(212,175,55,0.15)'"
+        onmouseout="this.style.borderColor='rgba(212,175,55,0.2)';this.style.transform='translateY(0)';this.style.boxShadow='none'">
+        <div style="font-size:52px;margin-bottom:16px;">💻</div>
+        <div style="font-family:'Montserrat',sans-serif;font-size:14px;font-weight:800;letter-spacing:2px;color:var(--gold);margin-bottom:10px;">COURS EN LIGNE</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.7;">Suivez la formation depuis chez vous · Accès aux cours en direct et en replay · Support WhatsApp</div>
+        <div style="margin-top:18px;padding:8px 16px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:8px;font-size:11px;font-family:'Montserrat',sans-serif;font-weight:700;color:var(--gold);">CHOISIR →</div>
+      </div>
+
+      <!-- Cours présentiel -->
+      <div onclick="selectCourseType('presentiel')" style="cursor:pointer;background:rgba(13,13,26,0.9);border:2px solid rgba(212,175,55,0.2);border-radius:20px;padding:32px 24px;text-align:center;transition:all 0.3s;position:relative;overflow:hidden;"
+        onmouseover="this.style.borderColor='#4da6ff';this.style.transform='translateY(-4px)';this.style.boxShadow='0 20px 50px rgba(77,166,255,0.15)'"
+        onmouseout="this.style.borderColor='rgba(212,175,55,0.2)';this.style.transform='translateY(0)';this.style.boxShadow='none'">
+        <div style="font-size:52px;margin-bottom:16px;">🏫</div>
+        <div style="font-family:'Montserrat',sans-serif;font-size:14px;font-weight:800;letter-spacing:2px;color:#4da6ff;margin-bottom:10px;">COURS PRÉSENTIEL</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.7;">Formation en salle · Interactions directes avec le formateur · Attestation officielle</div>
+        <div style="margin-top:18px;padding:8px 16px;background:rgba(77,166,255,0.1);border:1px solid rgba(77,166,255,0.3);border-radius:8px;font-size:11px;font-family:'Montserrat',sans-serif;font-weight:700;color:#4da6ff;">CHOISIR →</div>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;margin-top:24px;">
+      <button onclick="loadStudentDash(currentUser)" style="background:none;border:none;color:rgba(255,255,255,0.35);font-size:12px;cursor:pointer;font-family:'Raleway',sans-serif;text-decoration:underline;">← Retour au dashboard</button>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE COURS EN LIGNE ═══════ -->
+<div class="page" id="page-online">
+  <div style="min-height:calc(100vh - 60px);padding:80px 20px 40px;">
+  <div style="max-width:700px;margin:0 auto;">
+
+    <div style="text-align:center;margin-bottom:40px;animation:fadeUp 0.5s ease;">
+      <div style="display:inline-block;padding:8px 20px;background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);border-radius:20px;font-size:11px;font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:2px;color:#2ecc71;margin-bottom:16px;">✅ FORMATION EN LIGNE ACTIVÉE</div>
+      <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;margin-bottom:10px;">Votre espace <span style="color:var(--gold);">formation en ligne</span></div>
+      <div style="color:rgba(255,255,255,0.5);font-size:14px;">Bienvenue ! Voici toutes les informations pour suivre votre formation.</div>
+    </div>
+
+    <!-- Carte accès plateforme -->
+    <div style="background:rgba(13,13,26,0.9);border:1px solid rgba(212,175,55,0.2);border-radius:18px;padding:28px;margin-bottom:20px;animation:fadeUp 0.6s ease;">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(212,175,55,0.1);display:flex;align-items:center;justify-content:center;font-size:22px;">📱</div>
+        <div>
+          <div style="font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;color:var(--gold);">GROUPE WHATSAPP</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.45);margin-top:3px;">Rejoignez le groupe de la formation</div>
+        </div>
+      </div>
+      <a id="whatsapp-group-link" href="https://wa.me/22871126593" target="_blank" style="display:block;width:100%;padding:14px;background:linear-gradient(135deg,#128C7E,#25D366);color:white;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;border-radius:12px;text-align:center;text-decoration:none;box-sizing:border-box;box-shadow:0 8px 25px rgba(37,211,102,0.25);">
+        📲 REJOINDRE LE GROUPE WHATSAPP
+      </a>
+    </div>
+
+    <!-- Infos formation -->
+    <div style="background:rgba(13,13,26,0.9);border:1px solid rgba(212,175,55,0.2);border-radius:18px;padding:28px;margin-bottom:20px;animation:fadeUp 0.7s ease;">
+      <div style="font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;color:rgba(212,175,55,0.6);margin-bottom:18px;text-transform:uppercase;">📋 Informations de la formation</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:13px;color:rgba(255,255,255,0.5);">📅 Début</span>
+          <span style="font-size:13px;font-weight:600;color:var(--gold);" id="online-start-date">À confirmer</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:13px;color:rgba(255,255,255,0.5);">⏱ Durée</span>
+          <span style="font-size:13px;font-weight:600;">1 semaine intensive</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:13px;color:rgba(255,255,255,0.5);">🕘 Horaires</span>
+          <span style="font-size:13px;font-weight:600;">08h00 – 17h00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:13px;color:rgba(255,255,255,0.5);">📞 Contact formateur</span>
+          <span style="font-size:13px;font-weight:600;color:var(--gold);">+228 71 12 65 93</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Programme -->
+    <div style="background:rgba(13,13,26,0.9);border:1px solid rgba(212,175,55,0.2);border-radius:18px;padding:28px;margin-bottom:24px;animation:fadeUp 0.8s ease;">
+      <div style="font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;color:rgba(212,175,55,0.6);margin-bottom:18px;text-transform:uppercase;">📚 Programme de la semaine</div>
+      <ul id="online-programme-list" style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px;"></ul>
+    </div>
+
+    <!-- Modules : vidéos & fichiers -->
+    <div style="background:rgba(13,13,26,0.9);border:1px solid rgba(77,166,255,0.2);border-radius:18px;padding:28px;margin-bottom:24px;animation:fadeUp 0.85s ease;">
+      <div style="font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;color:rgba(77,166,255,0.7);margin-bottom:18px;text-transform:uppercase;">🎬 Vidéos & supports de cours</div>
+      <div id="online-modules-list"></div>
+    </div>
+
+    <div style="text-align:center;">
+      <button onclick="loadStudentDash(currentUser)" style="padding:12px 28px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:12px;color:var(--gold);font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;cursor:pointer;">← RETOUR AU DASHBOARD</button>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE COURS PRÉSENTIEL ═══════ -->
+<div class="page" id="page-presentiel">
+  <div style="min-height:calc(100vh - 60px);padding:80px 20px 40px;">
+  <div style="max-width:700px;margin:0 auto;">
+
+    <div style="text-align:center;margin-bottom:36px;animation:fadeUp 0.5s ease;">
+      <div style="display:inline-block;padding:8px 20px;background:rgba(77,166,255,0.1);border:1px solid rgba(77,166,255,0.3);border-radius:20px;font-size:11px;font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:2px;color:#4da6ff;margin-bottom:16px;">✅ FORMATION PRÉSENTIELLE CONFIRMÉE</div>
+      <div style="font-family:'Playfair Display',serif;font-size:32px;font-weight:700;margin-bottom:10px;">La formation commence <span style="color:var(--gold);">dans</span></div>
+    </div>
+
+    <!-- Grand chronomètre compte à rebours -->
+    <div style="background:rgba(13,13,26,0.95);border:1px solid rgba(212,175,55,0.25);border-radius:24px;padding:40px 28px;text-align:center;margin-bottom:24px;animation:fadeUp 0.6s ease;box-shadow:0 30px 80px rgba(0,0,0,0.4);">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;" id="presentiel-countdown-grid">
+        <div class="countdown-unit">
+          <div class="countdown-num" id="cd-days">00</div>
+          <div class="countdown-lbl">JOURS</div>
+        </div>
+        <div class="countdown-unit">
+          <div class="countdown-num" id="cd-hours">00</div>
+          <div class="countdown-lbl">HEURES</div>
+        </div>
+        <div class="countdown-unit">
+          <div class="countdown-num" id="cd-mins">00</div>
+          <div class="countdown-lbl">MINUTES</div>
+        </div>
+        <div class="countdown-unit">
+          <div class="countdown-num" id="cd-secs">00</div>
+          <div class="countdown-lbl">SECONDES</div>
+        </div>
+      </div>
+      <div style="height:1px;background:rgba(212,175,55,0.1);margin:20px 0;"></div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.4);font-family:'Montserrat',sans-serif;letter-spacing:1px;" id="presentiel-date-display">Date de la formation : —</div>
+    </div>
+
+    <!-- Lieu et infos -->
+    <div style="background:rgba(13,13,26,0.9);border:1px solid rgba(212,175,55,0.2);border-radius:18px;padding:28px;margin-bottom:20px;animation:fadeUp 0.7s ease;">
+      <div style="font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:3px;color:rgba(212,175,55,0.6);margin-bottom:18px;text-transform:uppercase;">📍 Lieu & Détails</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:20px;">📍</span>
+          <div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:4px;font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:1px;">LIEU</div>
+            <div style="font-size:14px;font-weight:600;" id="presentiel-lieu">À confirmer par l'organisateur</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:20px;">🏫</span>
+          <div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:4px;font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:1px;">SALLE</div>
+            <div style="font-size:14px;font-weight:600;" id="presentiel-salle">À confirmer</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:20px;">🕘</span>
+          <div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:4px;font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:1px;">HORAIRES</div>
+            <div style="font-size:14px;font-weight:600;">08h00 – 17h00 chaque jour</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 16px;background:rgba(255,255,255,0.03);border-radius:10px;">
+          <span style="font-size:20px;">📞</span>
+          <div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:4px;font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:1px;">CONTACT</div>
+            <div style="font-size:14px;font-weight:600;color:var(--gold);">+228 71 12 65 93</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Infos importantes -->
+    <div style="background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.15);border-radius:18px;padding:24px;margin-bottom:24px;animation:fadeUp 0.8s ease;">
+      <div style="font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:rgba(212,175,55,0.7);margin-bottom:14px;">⚠ À APPORTER LE JOUR J</div>
+      <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;">
+        <li style="font-size:13px;color:rgba(255,255,255,0.65);display:flex;align-items:center;gap:10px;"><span style="color:var(--gold);">✓</span> Votre reçu de paiement (téléchargé ou imprimé)</li>
+        <li style="font-size:13px;color:rgba(255,255,255,0.65);display:flex;align-items:center;gap:10px;"><span style="color:var(--gold);">✓</span> Une pièce d'identité valide (CNI ou passeport)</li>
+        <li style="font-size:13px;color:rgba(255,255,255,0.65);display:flex;align-items:center;gap:10px;"><span style="color:var(--gold);">✓</span> Un carnet de notes ou cahier</li>
+        <li style="font-size:13px;color:rgba(255,255,255,0.65);display:flex;align-items:center;gap:10px;"><span style="color:var(--gold);">✓</span> Arriver 15 minutes avant l'heure de début</li>
+      </ul>
+    </div>
+
+    <div style="text-align:center;">
+      <button onclick="loadStudentDash(currentUser)" style="padding:12px 28px;background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.3);border-radius:12px;color:var(--gold);font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.5px;cursor:pointer;">← RETOUR AU DASHBOARD</button>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- ═══════ PAGE ADMIN DASHBOARD ═══════ -->
+<div class="page" id="page-admin">
+  <div class="admin-container">
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-title" id="t-admin-title">Tableau de bord <span>Admin</span></div>
+        <div style="color:var(--text-muted); font-size:13px; margin-top:4px;" id="t-admin-sub">Gestion des inscriptions · AÏCHOLA MÉDIA</div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-lbl" id="t-stat-total">Total inscrits</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-today">0</div>
+        <div class="stat-lbl" id="t-stat-today">Inscrits aujourd'hui</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num green" id="stat-paid">0</div>
+        <div class="stat-lbl" id="t-stat-paid">Inscription payée</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="color:#e74c3c;" id="stat-pending-activation">0</div>
+        <div class="stat-lbl">En attente activation</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" style="font-size:22px;" id="stat-contact">71 12 65 93</div>
+        <div class="stat-lbl" id="t-stat-contact">Contact principal</div>
+      </div>
+    </div>
+
+    <div class="admin-table-card">
+      <div class="table-header">
+        <div class="table-title" id="t-all-students">Tous les étudiants</div>
+        <input class="table-search" id="admin-search" placeholder="🔍 Rechercher..." oninput="filterTable()">
+      </div>
+      <div class="table-scroll-wrap" id="table-wrap">
+        <table id="students-table">
+          <thead>
+            <tr>
+              <th style="min-width:50px;" id="t-th-photo">Photo</th>
+              <th style="min-width:140px;" id="t-th-nom">Nom complet</th>
+              <th style="min-width:170px;" id="t-th-email">Email</th>
+              <th style="min-width:110px;" id="t-th-tel">Téléphone</th>
+              <th style="min-width:90px;" id="t-th-niveau">Niveau</th>
+              <th style="min-width:130px;" id="t-th-adresse">Adresse</th>
+              <th style="min-width:110px;">Inscription</th>
+              <th style="min-width:110px; color:var(--gold);">Accès Dashboard</th>
+              <th style="min-width:110px;">Formation</th>
+              <th style="min-width:110px; color:#4da6ff;">Accès Formation</th>
+              <th style="min-width:90px;" id="t-th-date">Date</th>
+              <th style="min-width:120px;" id="t-th-action">Action</th>
+            </tr>
+          </thead>
+          <tbody id="students-tbody"></tbody>
+        </table>
+        <div class="empty-table hidden" id="empty-table">
+          <span class="emoji">🎓</span>
+          <span id="t-no-students">Aucun étudiant inscrit pour le moment</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ GESTION DU CONTENU DE LA FORMATION EN LIGNE ═══ -->
+    <div class="modules-admin-card">
+      <div class="modules-admin-heading">🎓 Contenu de la formation en ligne (vidéos & fichiers)</div>
+      <div id="modules-admin-list"></div>
+
+      <div class="module-form-card" id="module-form-card">
+        <div class="modules-admin-heading" id="module-form-heading" style="margin-bottom:14px;">➕ AJOUTER UN MODULE</div>
+        <input type="hidden" id="module-edit-id" value="">
+
+        <span class="module-form-label">Titre du module</span>
+        <input class="form-input" id="module-title-input" placeholder="Ex : Jour 1 — Introduction aux médias" style="margin-bottom:14px;">
+
+        <span class="module-form-label">Lien vidéo (YouTube, Vimeo ou lien direct .mp4) — optionnel</span>
+        <input class="form-input" id="module-video-input" placeholder="https://youtube.com/watch?v=... ou autre lien" style="margin-bottom:14px;">
+
+        <span class="module-form-label">📷 Ou ajoutez directement une vidéo / photo depuis votre galerie — optionnel</span>
+        <div class="media-upload-zone" id="module-media-upload-zone">
+          <input type="file" id="module-media-input" accept="image/*,video/*" style="display:none;" onchange="handleModuleMediaSelect(event)">
+          <button type="button" class="btn-mini btn-mini-gold" onclick="document.getElementById('module-media-input').click()">📁 Choisir une photo / vidéo</button>
+          <span class="media-upload-hint">Ouvre la galerie de votre téléphone ou ordinateur</span>
+        </div>
+        <div id="module-media-preview" class="module-media-preview" style="display:none;"></div>
+
+        <span class="module-form-label">Fichiers (liens Google Drive / Dropbox)</span>
+        <div id="module-files-rows" style="margin-top:8px;"></div>
+        <button type="button" onclick="addFileRowAdmin()" class="btn-mini btn-mini-gold" style="margin-bottom:18px;">＋ Ajouter un fichier</button>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button type="button" onclick="saveModuleForm()" class="btn-primary" style="flex:1; min-width:200px;">💾 ENREGISTRER LE MODULE</button>
+          <button type="button" onclick="resetModuleForm()" class="btn-mini-cancel">ANNULER</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="script.js" defer></script>
+</body>
+</html>
