@@ -1,6 +1,29 @@
 // ════════════════ DATA ════════════════
 const STORE_KEY = 'aichola_users';
-const ADMIN_CREDS = { email: 'admin@aichola.com', pass: 'Admin@2024' };
+// Identifiants admin PAR DÉFAUT (utilisés une seule fois, à la toute première
+// utilisation du site, pour initialiser la config dans Firestore). Une fois la
+// config créée en base, c'est ELLE qui fait foi — modifiable depuis le panneau
+// admin sans jamais toucher au code. Le mot de passe n'est jamais stocké en
+// clair, seulement son empreinte SHA-256 (hash).
+const DEFAULT_ADMIN_EMAIL = 'admin@aichola.com';
+const DEFAULT_ADMIN_SALT  = 'AICHOLA_ADMIN_9f3k2';
+const DEFAULT_ADMIN_HASH  = '10bdd21c9534bb22194fa1730822d04f388498303b1de4db3937ce56e1619bb5';
+
+// ════════════════ SÉCURITÉ : HACHAGE DES MOTS DE PASSE ════════════════
+// On ne stocke jamais un mot de passe en clair (ni dans le code, ni dans Firestore).
+// À la place on stocke un "hash" (empreinte) : impossible de retrouver le mot
+// de passe d'origine à partir du hash.
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder();
+  const data = enc.encode(salt + password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function randomSalt() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
 // Numéro marchand Aïchola
 const MERCHANT_TEL = '71 12 65 93';
 const MERCHANT_TEL_INT = '+228 71 12 65 93';
@@ -11,10 +34,27 @@ const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/VOTRE_LIEN_ICI'; // ← R
 // les fonctions getUsers()/getCourseContent() synchrones comme avant)
 let usersCache = [];
 let courseContentCache = [];
+let adminConfigCache = null; // { email, salt, hash } — chargé depuis Firestore
 let firestoreReady = false;
+let adminConfigReady = false;
 
 const usersDocRef = db.collection('aichola').doc('users');
 const courseDocRef = db.collection('aichola').doc('course_content');
+const adminConfigDocRef = db.collection('aichola').doc('admin_config');
+
+adminConfigDocRef.onSnapshot(function (snap) {
+  if (snap.exists) {
+    adminConfigCache = snap.data();
+  } else {
+    // Première utilisation du site : on initialise la config admin en base
+    // avec les identifiants par défaut (une seule fois).
+    adminConfigCache = { email: DEFAULT_ADMIN_EMAIL, salt: DEFAULT_ADMIN_SALT, hash: DEFAULT_ADMIN_HASH };
+    adminConfigDocRef.set(adminConfigCache).catch(function (err) { console.error('Erreur init config admin:', err); });
+  }
+  adminConfigReady = true;
+}, function (err) {
+  console.error('Erreur Firestore (admin_config):', err);
+});
 
 usersDocRef.onSnapshot(function (snap) {
   usersCache = (snap.exists && snap.data().list) ? snap.data().list : [];
@@ -529,7 +569,7 @@ function switchTab(tab) {
 }
 
 // ════════════════ AUTH ════════════════
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-pass').value;
   const errEl = document.getElementById('error-login');
@@ -542,16 +582,20 @@ function doLogin() {
   if (!pass) { showError(errEl, '⚠ Le mot de passe est obligatoire'); return; }
   if (pass.length < 6) { showError(errEl, '⚠ Mot de passe trop court'); return; }
   if (currentTab === 'admin') {
-    if (email === ADMIN_CREDS.email && pass === ADMIN_CREDS.pass) {
-      currentUser = { email: ADMIN_CREDS.email, role: 'admin', prenom: 'Admin', nom: '' };
+    if (!adminConfigCache) { showError(errEl, '⚠ Chargement en cours, réessayez dans 1 seconde.'); return; }
+    const enteredHash = await hashPassword(pass, adminConfigCache.salt);
+    if (email === adminConfigCache.email && enteredHash === adminConfigCache.hash) {
+      currentUser = { email: adminConfigCache.email, role: 'admin', prenom: 'Admin', nom: '' };
       showToast('✅', t('toast-login-title'), t('toast-login-msg'));
       loadAdminDash();
     } else { showError(errEl, t('err-login')); }
     return;
   }
   const users = getUsers();
-  const user = users.find(u => u.email === email && u.pass === pass);
+  const user = users.find(u => u.email === email);
   if (!user) { showError(errEl, t('err-login')); return; }
+  const enteredHash = await hashPassword(pass, user.salt || '');
+  if (enteredHash !== user.passHash) { showError(errEl, t('err-login')); return; }
   currentUser = user;
   showToast('✅', t('toast-login-title'), t('toast-login-msg'));
   // Si l'inscription n'est pas encore payée, rediriger vers paiement
@@ -636,7 +680,7 @@ function checkPassStrength() {
   txt.style.color = lvl.c;
 }
 
-function doRegister() {
+async function doRegister() {
   clearAllErrors();
   const prenom  = document.getElementById('reg-prenom').value.trim();
   const nom     = document.getElementById('reg-nom').value.trim();
@@ -696,9 +740,11 @@ function doRegister() {
   }
 
   const photo = document.getElementById('photo-preview').src || '';
+  const salt = randomSalt();
+  const passHash = await hashPassword(pass, salt);
   const newUser = {
     id: Date.now(),
-    prenom, nom, email, tel, niveau, adresse, pass,
+    prenom, nom, email, tel, niveau, adresse, salt, passHash,
     photo: photo && photo.startsWith('data:') ? photo : '',
     date: new Date().toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB'),
     payInscription: false,
@@ -1614,6 +1660,14 @@ function renderTable(filter = '') {
             </button>`
         : `<span style="font-size:10px;color:rgba(255,255,255,0.25);">—</span>`;
 
+      const resetPassBtn = `<button onclick="resetStudentPassword(${u.id})" style="
+              display:block; width:100%; margin-bottom:5px; padding:6px 0; border:none; border-radius:7px; cursor:pointer;
+              font-size:10px; font-weight:800; font-family:'Montserrat',sans-serif; letter-spacing:0.5px;
+              background:rgba(77,166,255,0.15); color:#4da6ff; border:1px solid rgba(77,166,255,0.35);
+              transition:all 0.2s;" onmouseover="this.style.background='rgba(77,166,255,0.3)'" onmouseout="this.style.background='rgba(77,166,255,0.15)'">
+              🔑 RESET MDP
+            </button>`;
+
       const deleteBtn = `<button onclick="deleteStudent(${u.id})" style="
               display:block; width:100%; padding:6px 0; border:none; border-radius:7px; cursor:pointer;
               font-size:10px; font-weight:800; font-family:'Montserrat',sans-serif; letter-spacing:0.5px;
@@ -1635,7 +1689,7 @@ function renderTable(filter = '') {
         <td style="text-align:center;">${formBadge}</td>
         <td style="min-width:100px;">${activateFormBtn}${deactivateFormBtn}</td>
         <td><div class="td-muted">${u.date}</div></td>
-        <td style="min-width:110px;">${deleteBtn}</td>
+        <td style="min-width:110px;">${resetPassBtn}${deleteBtn}</td>
       </tr>`;
     }).join('');
   }
@@ -1643,6 +1697,62 @@ function renderTable(filter = '') {
 }
 
 function filterTable() { renderTable(document.getElementById('admin-search').value); }
+
+async function changeAdminPassword() {
+  const msgEl = document.getElementById('admin-pass-msg');
+  const current = document.getElementById('admin-pass-current').value;
+  const next = document.getElementById('admin-pass-new').value;
+  const confirm2 = document.getElementById('admin-pass-confirm').value;
+  msgEl.style.color = '#e74c3c';
+
+  if (!adminConfigCache) { msgEl.textContent = '⚠ Chargement en cours, réessayez.'; return; }
+  const currentHash = await hashPassword(current, adminConfigCache.salt);
+  if (currentHash !== adminConfigCache.hash) { msgEl.textContent = '⚠ Mot de passe actuel incorrect.'; return; }
+  if (next.length < 8) { msgEl.textContent = '⚠ Le nouveau mot de passe doit faire au moins 8 caractères.'; return; }
+  if (next !== confirm2) { msgEl.textContent = '⚠ La confirmation ne correspond pas.'; return; }
+
+  const newSalt = randomSalt();
+  const newHash = await hashPassword(next, newSalt);
+  const updated = { email: adminConfigCache.email, salt: newSalt, hash: newHash };
+  try {
+    await adminConfigDocRef.set(updated);
+    adminConfigCache = updated;
+    msgEl.style.color = '#2ecc71';
+    msgEl.textContent = '✅ Mot de passe mis à jour avec succès.';
+    document.getElementById('admin-pass-current').value = '';
+    document.getElementById('admin-pass-new').value = '';
+    document.getElementById('admin-pass-confirm').value = '';
+  } catch (err) {
+    console.error(err);
+    msgEl.textContent = '⚠ Erreur de connexion, réessayez.';
+  }
+}
+
+function generateTempPassword() {
+  // Génère un mot de passe temporaire simple à communiquer par téléphone/WhatsApp
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out + '@' + Math.floor(10 + Math.random() * 90);
+}
+
+async function resetStudentPassword(id) {
+  const users = getUsers();
+  const idx = users.findIndex(u => u.id === id);
+  if (idx === -1) return;
+  const tempPass = generateTempPassword();
+  const salt = randomSalt();
+  const passHash = await hashPassword(tempPass, salt);
+  users[idx].salt = salt;
+  users[idx].passHash = passHash;
+  saveUsers(users);
+  const student = users[idx];
+  const msg = lang === 'fr'
+    ? `Nouveau mot de passe pour ${student.prenom} ${student.nom} :\n\n${tempPass}\n\nCommunique-le à l'étudiant(e), il/elle pourra ensuite se reconnecter avec.`
+    : `New password for ${student.prenom} ${student.nom}:\n\n${tempPass}\n\nShare it with the student — they can log in with it.`;
+  alert(msg);
+  renderTable(document.getElementById('admin-search').value);
+}
 
 function deleteStudent(id) {
   const msg = lang === 'fr' ? 'Supprimer cet étudiant ?' : 'Delete this student?';
@@ -1693,7 +1803,7 @@ window.addEventListener('load', () => {
     setTimeout(() => { try { el.parentNode.removeChild(el); } catch(e){} }, 600);
   }
   (function waitForData() {
-    if (firestoreReady) { setTimeout(hideLoading, 400); return; }
+    if (firestoreReady && adminConfigReady) { setTimeout(hideLoading, 400); return; }
     setTimeout(waitForData, 150);
   })();
   setTimeout(hideLoading, 5000); // filet de sécurité si pas de connexion internet
