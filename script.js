@@ -963,70 +963,201 @@ function showSummaryPage(ref, dateObj) {
   showPage('summary');
 }
 
-function downloadReceipt() {
-  const u = currentUser;
+// ════════════════ REÇU PDF (style officiel noir & blanc, sans tableaux) ════════════════
+function generateReceiptPDF(u) {
   if (!u) return;
-  const ref = document.getElementById('receipt-ref').textContent;
-  const amt = document.getElementById('receipt-amount').textContent;
-  const method = selectedMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO';
-  const dateStr = document.getElementById('receipt-date').textContent;
+  if (!window.jspdf) {
+    alert("Erreur : la bibliothèque PDF n'a pas pu se charger. Vérifiez votre connexion internet et réessayez.");
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const pageW = 210, pageH = 297;
+  const black = [15, 15, 15];
+  const gray = [100, 100, 100];
+  const lightGray = [225, 225, 225];
+  const marginL = 26, marginR = pageW - 26;
 
-  const sep = '=======================================';
-  const lines = [
-    'RECU DE PAIEMENT - AICHOLA MEDIA',
-    sep,
-    'Centre de Formation Professionnelle',
-    'Tel : +228 71 12 65 93',
-    sep,
-    '',
-    'DATE         : ' + dateStr,
-    'REFERENCE    : ' + ref,
-    '',
-    'ETUDIANT     : ' + u.prenom + ' ' + u.nom,
-    'EMAIL        : ' + u.email,
-    'TELEPHONE    : ' + u.tel,
-    'NIVEAU       : ' + u.niveau,
-    'ADRESSE      : ' + u.adresse,
-    '',
-    '---------------------------------------',
-    "FRAIS D'INSCRIPTION",
-    'MONTANT      : 10 000 F CFA',
-    'VIA          : ' + method,
-    'STATUT       : CONFIRME',
-  ];
+  doc.setTextColor(...black);
 
-  if (u.payFormation) {
-    const methodFormation = u.payFormationMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO';
-    lines.push('');
-    lines.push('---------------------------------------');
-    lines.push('FRAIS DE FORMATION');
-    lines.push('MONTANT      : 100 000 F CFA');
-    lines.push('REFERENCE    : ' + (u.payFormationRef || 'N/A'));
-    lines.push('DATE         : ' + (u.payFormationDate || ''));
-    lines.push('VIA          : ' + methodFormation);
-    lines.push('STATUT       : CONFIRME');
-    lines.push('');
-    lines.push('---------------------------------------');
-    lines.push('TOTAL PAYE   : 110 000 F CFA');
+  // ─── Tampon "PAYÉ" en filigrane (dessiné EN PREMIER, donc derrière tout le texte) ───
+  doc.setTextColor(...lightGray);
+  doc.setFont('times', 'bold'); doc.setFontSize(42);
+  doc.text('PAYÉ', pageW / 2, 165, { align: 'center', angle: 22 });
+  doc.setTextColor(...black);
+
+  // ─── Cadre décoratif extérieur (double liseré) ───
+  doc.setDrawColor(...black);
+  doc.setLineWidth(0.8);
+  doc.rect(8, 8, pageW - 16, pageH - 16);
+  doc.setLineWidth(0.25);
+  doc.rect(10.5, 10.5, pageW - 21, pageH - 21);
+  function corner(x, y, sx, sy) {
+    doc.setLineWidth(0.5);
+    doc.line(x, y, x + 7 * sx, y);
+    doc.line(x, y, x, y + 7 * sy);
+  }
+  corner(14, 14, 1, 1); corner(pageW - 14, 14, -1, 1);
+  corner(14, pageH - 14, 1, -1); corner(pageW - 14, pageH - 14, -1, -1);
+
+  // Ligne pointillée : libellé ....... valeur (aligné à droite)
+  function dottedLine(label, value, y, opts = {}) {
+    const fs = opts.fontSize || 10.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fs);
+    doc.setTextColor(...black);
+    doc.text(label, marginL, y);
+    doc.setFont(opts.valueFont || 'helvetica', opts.valueStyle || 'bold');
+    doc.setFontSize(opts.valueSize || fs);
+    const valW = doc.getTextWidth(value);
+    doc.text(value, marginR, y, { align: 'right' });
+    const labelW = doc.getTextWidth(label) + 3;
+    const dotsEnd = marginR - valW - 3;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fs);
+    doc.setTextColor(...lightGray);
+    let dots = '';
+    const dotW = doc.getTextWidth('. ');
+    const spaceAvail = dotsEnd - (marginL + labelW);
+    const count = Math.max(0, Math.floor(spaceAvail / dotW));
+    for (let i = 0; i < count; i++) dots += '. ';
+    doc.text(dots, marginL + labelW, y);
+    doc.setTextColor(...black);
   }
 
-  lines.push('---------------------------------------');
-  lines.push('');
-  lines.push('Merci pour votre confiance.');
-  lines.push('Conservez ce document comme preuve de paiement.');
-  lines.push('');
-  lines.push('AICHOLA MEDIA - +228 71 12 65 93');
-  lines.push(sep);
+  // ─── Sceau / monogramme ───
+  const cx = pageW / 2, cy = 24;
+  doc.setLineWidth(0.6); doc.circle(cx, cy, 10, 'S');
+  doc.setLineWidth(0.25); doc.circle(cx, cy, 8.2, 'S');
+  doc.setFont('times', 'bold'); doc.setFontSize(14);
+  doc.text('AM', cx, cy + 3, { align: 'center' });
 
-  const content = lines.join('\n');
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'Recu-AicholaMedia-' + ref + '.txt';
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('📥', 'Recu telecharge', 'Fichier enregistre sur votre appareil.');
+  // ─── En-tête ───
+  let y = 42;
+  doc.setFont('times', 'bold'); doc.setFontSize(22);
+  doc.text('AÏCHOLA MÉDIA', pageW / 2, y, { align: 'center' });
+  y += 6;
+  doc.setFont('times', 'italic'); doc.setFontSize(10.5); doc.setTextColor(...gray);
+  doc.text('Centre de Formation Professionnelle', pageW / 2, y, { align: 'center' });
+  y += 4.5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.text('+228 71 12 65 93', pageW / 2, y, { align: 'center' });
+
+  y += 6;
+  doc.setDrawColor(...black); doc.setLineWidth(0.6);
+  doc.line(30, y, pageW - 30, y);
+  doc.setLineWidth(0.2);
+  doc.line(30, y + 1.2, pageW - 30, y + 1.2);
+
+  y += 10;
+  doc.setTextColor(...black);
+  doc.setFont('times', 'bold'); doc.setFontSize(15);
+  doc.text('REÇU DE PAIEMENT OFFICIEL', pageW / 2, y, { align: 'center' });
+  y += 4.5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
+  doc.text('Conservez ce document comme preuve de paiement', pageW / 2, y, { align: 'center' });
+  doc.setTextColor(...black);
+
+  // ─── Référence & Date ───
+  y += 12;
+  dottedLine('Référence du paiement', String(u.payRef || 'N/A'), y, { fontSize: 10.5 });
+  y += 8;
+  dottedLine('Date d\'émission', String(u.payDate || new Date().toLocaleDateString('fr-FR')), y, { fontSize: 10.5 });
+
+  // ─── Section identité ───
+  y += 12;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text("IDENTITÉ DE L'ÉTUDIANT", marginL, y);
+  doc.setLineWidth(0.3);
+  doc.line(marginL, y + 2.2, marginR, y + 2.2);
+  y += 10;
+  doc.setFont('times', 'bold'); doc.setFontSize(14);
+  doc.text(`${u.prenom} ${u.nom}`, marginL, y);
+  y += 10;
+  dottedLine('Adresse e-mail', String(u.email), y); y += 8;
+  dottedLine('Numéro de téléphone', String(u.tel), y); y += 8;
+  dottedLine('Niveau / Formation', String(u.niveau), y); y += 8;
+  dottedLine('Adresse', String(u.adresse), y);
+
+  // ─── Section paiement ───
+  y += 12;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.text('DÉTAIL DU PAIEMENT', marginL, y);
+  doc.setLineWidth(0.3);
+  doc.line(marginL, y + 2.2, marginR, y + 2.2);
+  y += 10;
+
+  dottedLine("Frais d'inscription", '10 000 F CFA', y, { fontSize: 10.5, valueFont: 'times', valueSize: 12.5 });
+  y += 6;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+  doc.text(`Réf : ${u.payRef || 'N/A'}   ·   Mode : ${u.payMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}   ·   Statut : confirmé`, marginL, y);
+  doc.setTextColor(...black);
+  y += 9;
+
+  if (u.payFormation) {
+    dottedLine('Frais de formation', '100 000 F CFA', y, { fontSize: 10.5, valueFont: 'times', valueSize: 12.5 });
+    y += 6;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+    doc.text(`Réf : ${u.payFormationRef || 'N/A'}   ·   Mode : ${u.payFormationMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}   ·   Statut : confirmé`, marginL, y);
+    doc.setTextColor(...black);
+    y += 9;
+
+    doc.setLineWidth(0.6);
+    doc.line(marginL, y, marginR, y);
+    y += 7;
+    dottedLine('TOTAL GÉNÉRAL PAYÉ', '110 000 F CFA', y, { fontSize: 11.5, valueFont: 'times', valueSize: 15 });
+    y += 2.5;
+    doc.setLineWidth(0.6);
+    doc.line(marginL, y, marginR, y);
+    y += 9;
+  } else {
+    doc.setLineWidth(0.3);
+    doc.line(marginL, y, marginR, y);
+    y += 9;
+  }
+
+  // ─── Statut ───
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+  doc.text("✓  PAIEMENT VALIDÉ PAR L'ADMINISTRATEUR", pageW / 2, y, { align: 'center' });
+  y += 10;
+
+  // ─── Mention légale (courte, pour ne jamais déborder même avec 2 paiements) ───
+  doc.setFont('times', 'italic'); doc.setFontSize(8); doc.setTextColor(...gray);
+  const mention = "Ce reçu fait foi de paiement auprès du Centre AÏCHOLA MÉDIA. À conserver ; toute contestation doit être signalée sous 7 jours à compter de la date d'émission.";
+  const mentionLines = doc.splitTextToSize(mention, marginR - marginL);
+  doc.text(mentionLines, pageW / 2, y, { align: 'center' });
+  const mentionHeight = doc.getTextDimensions(mentionLines).h;
+  doc.setTextColor(...black);
+  y += mentionHeight;
+
+  // ─── Signature / cachet (position calculée dynamiquement, jamais fixe) ───
+  y += 12;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
+  doc.text('Fait à Lomé, le ' + new Date().toLocaleDateString('fr-FR'), marginL, y);
+  doc.setDrawColor(...black); doc.setLineWidth(0.3);
+  doc.line(marginR - 50, y + 2.5, marginR, y + 2.5);
+  doc.text('Signature / Cachet', marginR - 25, y + 7, { align: 'center' });
+
+  // ─── Pied de page ───
+  y += 15;
+  doc.setDrawColor(...black); doc.setLineWidth(0.3);
+  doc.line(marginL, y, marginR, y);
+  y += 6;
+  doc.setFont('times', 'italic'); doc.setFontSize(8.5); doc.setTextColor(...gray);
+  doc.text(`Merci pour votre confiance, ${u.prenom}.`, pageW / 2, y, { align: 'center' });
+  y += 5.5;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.text('AÏCHOLA MÉDIA — Centre de Formation Professionnelle — +228 71 12 65 93', pageW / 2, y, { align: 'center' });
+
+  const fileName = `Recu-${u.prenom}-${u.nom}-AicholaMedia.pdf`.replace(/\s+/g, '-');
+  doc.save(fileName);
+  showToast('📥', 'Reçu téléchargé !', 'Le fichier PDF a été enregistré — vous pouvez aussi l\'imprimer.');
+}
+
+
+
+function downloadReceipt() {
+  generateReceiptPDF(currentUser);
 }
 
 function goToPayFormation() {
@@ -1129,186 +1260,7 @@ function afterFormationPayment() {
 
 // ════ TÉLÉCHARGER REÇU HTML MODERNE ════
 function downloadReceiptFromDash() {
-  const u = currentUser;
-  if (!u) return;
-  const ref    = u.payRef || 'N/A';
-  const method = u.payMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO';
-  const methodColor = u.payMethod === 'moov' ? '#ffaa33' : '#4da6ff';
-  const dateStr  = u.payDate || new Date().toLocaleDateString('fr-FR');
-  const fullName = u.prenom + ' ' + u.nom;
-
-  // Formation payment info
-  const hasFormation = !!u.payFormation;
-  const refFormation = u.payFormationRef || 'N/A';
-  const methodFormation = u.payFormationMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO';
-  const methodFormationColor = u.payFormationMethod === 'moov' ? '#ffaa33' : '#4da6ff';
-  const dateFormation = u.payFormationDate || '';
-
-  const html = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reçu – ${fullName}</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Montserrat:wght@400;600;700;800&display=swap');
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:#0a0a0f; font-family:'Montserrat',sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:30px 20px; }
-  .receipt { width:100%; max-width:520px; background:#0d0d1a; border-radius:24px; overflow:hidden; box-shadow:0 40px 100px rgba(0,0,0,0.7); position:relative; }
-  .receipt::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#b8860b,#f5e17a,#d4af37,#b8860b); }
-  .header { background:linear-gradient(135deg,#0d0d1a 0%,#111128 100%); padding:40px 36px 30px; text-align:center; border-bottom:1px solid rgba(212,175,55,0.15); }
-  .logo-circle { width:70px; height:70px; border-radius:50%; background:linear-gradient(135deg,#b8860b,#f5e17a); display:flex; align-items:center; justify-content:center; font-size:28px; margin:0 auto 16px; box-shadow:0 8px 30px rgba(212,175,55,0.3); }
-  .brand { font-family:'Playfair Display',serif; font-size:26px; font-weight:900; color:#d4af37; letter-spacing:1px; }
-  .brand-sub { font-size:10px; color:rgba(255,255,255,0.4); letter-spacing:3px; text-transform:uppercase; margin-top:5px; }
-  .confirmed-badge { display:inline-flex; align-items:center; gap:8px; margin-top:20px; padding:8px 20px; background:rgba(46,204,113,0.12); border:1px solid rgba(46,204,113,0.35); border-radius:20px; }
-  .confirmed-dot { width:8px; height:8px; border-radius:50%; background:#2ecc71; box-shadow:0 0 8px #2ecc71; animation:pulse 2s infinite; }
-  .confirmed-txt { font-size:11px; font-weight:700; color:#2ecc71; letter-spacing:2px; text-transform:uppercase; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-  .body { padding:32px 36px; }
-  .receipt-title { text-align:center; margin-bottom:28px; }
-  .receipt-title h2 { font-family:'Playfair Display',serif; font-size:22px; color:white; font-weight:700; }
-  .receipt-title p { font-size:11px; color:rgba(255,255,255,0.35); margin-top:5px; letter-spacing:1px; }
-  .meta-row { display:flex; justify-content:space-between; align-items:center; background:rgba(212,175,55,0.06); border:1px solid rgba(212,175,55,0.12); border-radius:12px; padding:14px 18px; margin-bottom:24px; }
-  .meta-item label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(212,175,55,0.5); display:block; margin-bottom:5px; }
-  .meta-item span { font-size:14px; font-weight:800; color:#d4af37; letter-spacing:1px; }
-  .meta-item.right { text-align:right; }
-  .meta-item.right span { font-size:12px; color:rgba(255,255,255,0.6); font-weight:600; }
-  .section-title { font-size:9px; font-weight:700; letter-spacing:3px; text-transform:uppercase; color:rgba(212,175,55,0.5); margin-bottom:12px; padding-left:4px; }
-  .student-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:20px; margin-bottom:20px; }
-  .student-name { font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:white; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.07); }
-  .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .info-item label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.3); display:block; margin-bottom:4px; }
-  .info-item span { font-size:12px; color:rgba(255,255,255,0.75); font-weight:600; }
-  .amount-card { background:linear-gradient(135deg,rgba(212,175,55,0.08),rgba(212,175,55,0.15)); border:1px solid rgba(212,175,55,0.25); border-radius:14px; padding:20px 24px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; }
-  .amount-left label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(212,175,55,0.6); display:block; margin-bottom:6px; }
-  .amount-left .type { font-size:12px; color:rgba(255,255,255,0.55); margin-top:5px; }
-  .amount-left .ref-small { font-size:9px; color:rgba(255,255,255,0.3); margin-top:4px; letter-spacing:0.5px; }
-  .amount-val { font-family:'Montserrat',sans-serif; font-size:36px; font-weight:800; color:#d4af37; letter-spacing:-1px; }
-  .amount-unit { font-size:14px; font-weight:600; color:rgba(212,175,55,0.6); margin-left:4px; }
-  .total-card { background:linear-gradient(135deg,rgba(212,175,55,0.12),rgba(212,175,55,0.22)); border:2px solid rgba(212,175,55,0.4); border-radius:14px; padding:16px 24px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; }
-  .total-lbl { font-size:11px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:rgba(212,175,55,0.8); }
-  .total-val { font-family:'Montserrat',sans-serif; font-size:28px; font-weight:800; color:#d4af37; }
-  .total-unit { font-size:13px; font-weight:600; color:rgba(212,175,55,0.6); margin-left:4px; }
-  .method-row { display:flex; align-items:center; gap:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:14px 18px; margin-bottom:20px; }
-  .method-icon { width:40px; height:40px; border-radius:10px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:20px; }
-  .method-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.3); margin-bottom:4px; }
-  .method-name { font-size:13px; font-weight:800; color:${methodColor}; letter-spacing:1px; }
-  .status-row { display:flex; align-items:center; justify-content:space-between; background:rgba(46,204,113,0.06); border:1px solid rgba(46,204,113,0.2); border-radius:12px; padding:14px 18px; margin-bottom:28px; }
-  .status-lbl { font-size:11px; color:rgba(255,255,255,0.4); }
-  .status-val { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:800; color:#2ecc71; letter-spacing:1px; }
-  .footer { border-top:1px solid rgba(212,175,55,0.1); padding:20px 36px; background:rgba(0,0,0,0.2); text-align:center; }
-  .footer p { font-size:11px; color:rgba(255,255,255,0.3); line-height:1.7; }
-  .footer strong { color:rgba(212,175,55,0.6); }
-  .print-btn { display:inline-block; margin-top:16px; padding:10px 24px; background:rgba(212,175,55,0.1); border:1px solid rgba(212,175,55,0.3); border-radius:8px; color:#d4af37; font-family:'Montserrat',sans-serif; font-size:11px; font-weight:700; letter-spacing:1.5px; cursor:pointer; text-transform:uppercase; }
-  @media print { body{background:white;} .receipt{box-shadow:none;} .print-btn{display:none;} }
-</style>
-</head>
-<body>
-<div class="receipt">
-  <div class="header">
-    <div class="logo-circle">🎓</div>
-    <div class="brand">AÏCHOLA MÉDIA</div>
-    <div class="brand-sub">Centre de Formation Professionnelle</div>
-    <div class="confirmed-badge">
-      <div class="confirmed-dot"></div>
-      <span class="confirmed-txt">Paiement Confirmé</span>
-    </div>
-  </div>
-  <div class="body">
-    <div class="receipt-title">
-      <h2>Reçu de Paiement Officiel</h2>
-      <p>Conservez ce document comme preuve de paiement</p>
-    </div>
-    <div class="meta-row">
-      <div class="meta-item">
-        <label>Référence</label>
-        <span>${ref}</span>
-      </div>
-      <div class="meta-item right">
-        <label>Date</label>
-        <span>${dateStr}</span>
-      </div>
-    </div>
-    <div class="section-title">Informations de l'étudiant</div>
-    <div class="student-card">
-      <div class="student-name">👤 ${fullName}</div>
-      <div class="info-grid">
-        <div class="info-item"><label>Email</label><span>${u.email}</span></div>
-        <div class="info-item"><label>Téléphone</label><span>${u.tel}</span></div>
-        <div class="info-item"><label>Niveau</label><span>${u.niveau}</span></div>
-        <div class="info-item"><label>Adresse</label><span>${u.adresse}</span></div>
-      </div>
-    </div>
-    <div class="section-title">Détail du paiement</div>
-    <div class="amount-card">
-      <div class="amount-left">
-        <label>Montant payé</label>
-        <div class="type">Frais d'inscription</div>
-        <div class="ref-small">Réf : ${ref} · ${dateStr}</div>
-      </div>
-      <div>
-        <span class="amount-val">10 000</span>
-        <span class="amount-unit">F CFA</span>
-      </div>
-    </div>
-    ${hasFormation ? `
-    <div class="amount-card" style="background:linear-gradient(135deg,rgba(77,166,255,0.08),rgba(77,166,255,0.15));border-color:rgba(77,166,255,0.25);">
-      <div class="amount-left">
-        <label style="color:rgba(77,166,255,0.7);">Montant payé</label>
-        <div class="type">Frais de formation</div>
-        <div class="ref-small">Réf : ${refFormation} · ${dateFormation}</div>
-      </div>
-      <div>
-        <span class="amount-val" style="color:#4da6ff;">100 000</span>
-        <span class="amount-unit" style="color:rgba(77,166,255,0.6);">F CFA</span>
-      </div>
-    </div>
-    <div class="total-card">
-      <span class="total-lbl">TOTAL PAYÉ</span>
-      <span class="total-val">110 000 <span class="total-unit">F CFA</span></span>
-    </div>
-    ` : ''}
-    <div class="method-row">
-      <div class="method-icon">${u.payMethod === 'moov' ? '💳' : '📱'}</div>
-      <div>
-        <div class="method-label">Mode de paiement · Inscription</div>
-        <div class="method-name">${method}</div>
-      </div>
-    </div>
-    ${hasFormation ? `
-    <div class="method-row" style="border-color:rgba(77,166,255,0.15);">
-      <div class="method-icon">${u.payFormationMethod === 'moov' ? '💳' : '📱'}</div>
-      <div>
-        <div class="method-label">Mode de paiement · Formation</div>
-        <div class="method-name" style="color:${methodFormationColor};">${methodFormation}</div>
-      </div>
-    </div>
-    ` : ''}
-    <div class="status-row">
-      <span class="status-lbl">Statut du paiement</span>
-      <span class="status-val">✓ VALIDÉ PAR L'ADMINISTRATEUR</span>
-    </div>
-  </div>
-  <div class="footer">
-    <p>Merci pour votre confiance, <strong>${u.prenom}</strong> !<br>
-    Pour toute question : <strong>+228 71 12 65 93</strong> (WhatsApp / Appel)<br>
-    <strong>AÏCHOLA MÉDIA</strong> – Centre de Formation Professionnelle</p>
-    <button class="print-btn" onclick="window.print()">🖨 IMPRIMER CE REÇU</button>
-  </div>
-</div>
-</body>
-</html>`;
-
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'Recu-' + fullName.replace(' ', '-') + '-AicholaMedia.html';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('📥', 'Reçu téléchargé !', 'Ouvrez le fichier dans votre navigateur pour l\'imprimer.');
+  generateReceiptPDF(currentUser);
 }
 
 // ════════════════ PAGE ATTENTE ACTIVATION ════════════════
