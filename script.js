@@ -975,15 +975,9 @@ function generateReceiptPDF(u) {
   const pageW = 210, pageH = 297;
   const black = [15, 15, 15];
   const gray = [100, 100, 100];
-  const lightGray = [225, 225, 225];
+  const lightGray = [210, 210, 210];
   const marginL = 26, marginR = pageW - 26;
 
-  doc.setTextColor(...black);
-
-  // ─── Tampon "PAYÉ" en filigrane (dessiné EN PREMIER, donc derrière tout le texte) ───
-  doc.setTextColor(...lightGray);
-  doc.setFont('times', 'bold'); doc.setFontSize(42);
-  doc.text('PAYÉ', pageW / 2, 165, { align: 'center', angle: 22 });
   doc.setTextColor(...black);
 
   // ─── Cadre décoratif extérieur (double liseré) ───
@@ -1026,134 +1020,134 @@ function generateReceiptPDF(u) {
   }
 
   // ─── Sceau / monogramme ───
-  const cx = pageW / 2, cy = 24;
-  doc.setLineWidth(0.6); doc.circle(cx, cy, 10, 'S');
-  doc.setLineWidth(0.25); doc.circle(cx, cy, 8.2, 'S');
-  doc.setFont('times', 'bold'); doc.setFontSize(14);
-  doc.text('AM', cx, cy + 3, { align: 'center' });
+  const cx = pageW / 2, cy = 26;
+  doc.setLineWidth(0.6); doc.circle(cx, cy, 11, 'S');
+  doc.setLineWidth(0.25); doc.circle(cx, cy, 9, 'S');
+  doc.setFont('times', 'bold'); doc.setFontSize(15);
+  doc.text('AM', cx, cy + 3.2, { align: 'center' });
 
   // ─── En-tête ───
-  let y = 42;
-  doc.setFont('times', 'bold'); doc.setFontSize(22);
+  let y = 46;
+  doc.setFont('times', 'bold'); doc.setFontSize(23);
   doc.text('AÏCHOLA MÉDIA', pageW / 2, y, { align: 'center' });
-  y += 6;
-  doc.setFont('times', 'italic'); doc.setFontSize(10.5); doc.setTextColor(...gray);
+  y += 6.5;
+  doc.setFont('times', 'italic'); doc.setFontSize(11); doc.setTextColor(...gray);
   doc.text('Centre de Formation Professionnelle', pageW / 2, y, { align: 'center' });
-  y += 4.5;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  y += 5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
   doc.text('+228 71 12 65 93', pageW / 2, y, { align: 'center' });
 
-  y += 6;
+  y += 7;
   doc.setDrawColor(...black); doc.setLineWidth(0.6);
   doc.line(30, y, pageW - 30, y);
   doc.setLineWidth(0.2);
   doc.line(30, y + 1.2, pageW - 30, y + 1.2);
 
-  y += 10;
+  y += 13;
   doc.setTextColor(...black);
-  doc.setFont('times', 'bold'); doc.setFontSize(15);
+  doc.setFont('times', 'bold'); doc.setFontSize(16);
   doc.text('REÇU DE PAIEMENT OFFICIEL', pageW / 2, y, { align: 'center' });
-  y += 4.5;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
+  y += 5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...gray);
   doc.text('Conservez ce document comme preuve de paiement', pageW / 2, y, { align: 'center' });
   doc.setTextColor(...black);
 
   // ─── Référence & Date ───
-  y += 12;
-  dottedLine('Référence du paiement', String(u.payRef || 'N/A'), y, { fontSize: 10.5 });
-  y += 8;
-  dottedLine('Date d\'émission', String(u.payDate || new Date().toLocaleDateString('fr-FR')), y, { fontSize: 10.5 });
+  y += 14;
+  dottedLine('Référence du paiement', String(u.payRef || 'N/A'), y, { fontSize: 11 });
+  y += 10;
+  dottedLine('Date d\'émission', String(u.payDate || new Date().toLocaleDateString('fr-FR')), y, { fontSize: 11 });
 
   // ─── Section identité ───
-  y += 12;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  y += 16;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
   doc.text("IDENTITÉ DE L'ÉTUDIANT", marginL, y);
   doc.setLineWidth(0.3);
-  doc.line(marginL, y + 2.2, marginR, y + 2.2);
-  y += 10;
-  doc.setFont('times', 'bold'); doc.setFontSize(14);
+  doc.line(marginL, y + 2.5, marginR, y + 2.5);
+  y += 13;
+  doc.setFont('times', 'bold'); doc.setFontSize(15);
   doc.text(`${u.prenom} ${u.nom}`, marginL, y);
-  y += 10;
-  dottedLine('Adresse e-mail', String(u.email), y); y += 8;
-  dottedLine('Numéro de téléphone', String(u.tel), y); y += 8;
-  dottedLine('Niveau / Formation', String(u.niveau), y); y += 8;
+  y += 12;
+  dottedLine('Adresse e-mail', String(u.email), y); y += 10;
+  dottedLine('Numéro de téléphone', String(u.tel), y); y += 10;
+  dottedLine('Niveau / Formation', String(u.niveau), y); y += 10;
   dottedLine('Adresse', String(u.adresse), y);
 
   // ─── Section paiement ───
-  y += 12;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  y += 16;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
   doc.text('DÉTAIL DU PAIEMENT', marginL, y);
   doc.setLineWidth(0.3);
-  doc.line(marginL, y + 2.2, marginR, y + 2.2);
-  y += 10;
+  doc.line(marginL, y + 2.5, marginR, y + 2.5);
+  y += 13;
 
-  dottedLine("Frais d'inscription", '10 000 F CFA', y, { fontSize: 10.5, valueFont: 'times', valueSize: 12.5 });
-  y += 6;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+  dottedLine("Frais d'inscription", '10 000 F CFA', y, { fontSize: 11, valueFont: 'times', valueSize: 13 });
+  y += 7;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
   doc.text(`Réf : ${u.payRef || 'N/A'}   ·   Mode : ${u.payMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}   ·   Statut : confirmé`, marginL, y);
   doc.setTextColor(...black);
-  y += 9;
+  y += 12;
 
   if (u.payFormation) {
-    dottedLine('Frais de formation', '100 000 F CFA', y, { fontSize: 10.5, valueFont: 'times', valueSize: 12.5 });
-    y += 6;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+    dottedLine('Frais de formation', '100 000 F CFA', y, { fontSize: 11, valueFont: 'times', valueSize: 13 });
+    y += 7;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
     doc.text(`Réf : ${u.payFormationRef || 'N/A'}   ·   Mode : ${u.payFormationMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}   ·   Statut : confirmé`, marginL, y);
     doc.setTextColor(...black);
-    y += 9;
+    y += 12;
 
     doc.setLineWidth(0.6);
     doc.line(marginL, y, marginR, y);
-    y += 7;
-    dottedLine('TOTAL GÉNÉRAL PAYÉ', '110 000 F CFA', y, { fontSize: 11.5, valueFont: 'times', valueSize: 15 });
-    y += 2.5;
+    y += 9;
+    dottedLine('TOTAL GÉNÉRAL PAYÉ', '110 000 F CFA', y, { fontSize: 12.5, valueFont: 'times', valueSize: 16 });
+    y += 3;
     doc.setLineWidth(0.6);
     doc.line(marginL, y, marginR, y);
-    y += 9;
+    y += 12;
   } else {
+    y += 4;
     doc.setLineWidth(0.3);
     doc.line(marginL, y, marginR, y);
-    y += 9;
+    y += 12;
   }
 
   // ─── Statut ───
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
   doc.text("✓  PAIEMENT VALIDÉ PAR L'ADMINISTRATEUR", pageW / 2, y, { align: 'center' });
-  y += 10;
+  y += 14;
 
-  // ─── Mention légale (courte, pour ne jamais déborder même avec 2 paiements) ───
-  doc.setFont('times', 'italic'); doc.setFontSize(8); doc.setTextColor(...gray);
-  const mention = "Ce reçu fait foi de paiement auprès du Centre AÏCHOLA MÉDIA. À conserver ; toute contestation doit être signalée sous 7 jours à compter de la date d'émission.";
+  // ─── Mention légale (comble l'espace, apporte un ton officiel) ───
+  doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(...gray);
+  const mention = "Le présent reçu fait foi de paiement auprès du Centre de Formation Professionnelle AÏCHOLA MÉDIA. Il doit être conservé par l'étudiant(e) pour toute réclamation ou vérification ultérieure. Toute contestation doit être signalée dans un délai de sept (7) jours à compter de la date d'émission mentionnée ci-dessus.";
   const mentionLines = doc.splitTextToSize(mention, marginR - marginL);
   doc.text(mentionLines, pageW / 2, y, { align: 'center' });
-  const mentionHeight = doc.getTextDimensions(mentionLines).h;
   doc.setTextColor(...black);
-  y += mentionHeight;
 
-  // ─── Signature / cachet (position calculée dynamiquement, jamais fixe) ───
-  y += 12;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
-  doc.text('Fait à Lomé, le ' + new Date().toLocaleDateString('fr-FR'), marginL, y);
+  // ─── Tampon "PAYÉ" en filigrane ───
+  doc.setTextColor(...lightGray);
+  doc.setFont('times', 'bold'); doc.setFontSize(50);
+  doc.text('PAYÉ', pageW / 2, pageH / 2 + 40, { align: 'center', angle: 22 });
+  doc.setTextColor(...black);
+
+  // ─── Signature / cachet ───
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...gray);
+  doc.text('Fait à Lomé, le ' + new Date().toLocaleDateString('fr-FR'), marginL, 250);
   doc.setDrawColor(...black); doc.setLineWidth(0.3);
-  doc.line(marginR - 50, y + 2.5, marginR, y + 2.5);
-  doc.text('Signature / Cachet', marginR - 25, y + 7, { align: 'center' });
+  doc.line(marginR - 50, 253, marginR, 253);
+  doc.text('Signature / Cachet', marginR - 25, 258, { align: 'center' });
 
   // ─── Pied de page ───
-  y += 15;
   doc.setDrawColor(...black); doc.setLineWidth(0.3);
-  doc.line(marginL, y, marginR, y);
-  y += 6;
-  doc.setFont('times', 'italic'); doc.setFontSize(8.5); doc.setTextColor(...gray);
-  doc.text(`Merci pour votre confiance, ${u.prenom}.`, pageW / 2, y, { align: 'center' });
-  y += 5.5;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-  doc.text('AÏCHOLA MÉDIA — Centre de Formation Professionnelle — +228 71 12 65 93', pageW / 2, y, { align: 'center' });
+  doc.line(marginL, 268, marginR, 268);
+  doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(...gray);
+  doc.text(`Merci pour votre confiance, ${u.prenom}.`, pageW / 2, 274, { align: 'center' });
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.text('AÏCHOLA MÉDIA — Centre de Formation Professionnelle — +228 71 12 65 93', pageW / 2, 280, { align: 'center' });
 
   const fileName = `Recu-${u.prenom}-${u.nom}-AicholaMedia.pdf`.replace(/\s+/g, '-');
   doc.save(fileName);
   showToast('📥', 'Reçu téléchargé !', 'Le fichier PDF a été enregistré — vous pouvez aussi l\'imprimer.');
 }
-
 
 
 function downloadReceipt() {
