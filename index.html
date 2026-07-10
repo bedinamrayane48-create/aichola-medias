@@ -793,6 +793,24 @@
       </div>
     </div>
 
+    <!-- ═══ SÉCURITÉ : CHANGER MON MOT DE PASSE ADMIN ═══ -->
+    <div class="modules-admin-card">
+      <div class="modules-admin-heading">🔐 Changer mon mot de passe admin</div>
+      <div class="module-form-card">
+        <span class="module-form-label">Mot de passe actuel</span>
+        <input type="password" class="form-input" id="admin-pass-current" placeholder="••••••••" style="margin-bottom:14px;">
+
+        <span class="module-form-label">Nouveau mot de passe (min. 8 caractères)</span>
+        <input type="password" class="form-input" id="admin-pass-new" placeholder="••••••••" style="margin-bottom:14px;">
+
+        <span class="module-form-label">Confirmer le nouveau mot de passe</span>
+        <input type="password" class="form-input" id="admin-pass-confirm" placeholder="••••••••" style="margin-bottom:14px;">
+
+        <div id="admin-pass-msg" style="font-size:13px;margin-bottom:10px;"></div>
+        <button class="btn-primary" onclick="changeAdminPassword()">Mettre à jour le mot de passe</button>
+      </div>
+    </div>
+
     <!-- ═══ GESTION DU CONTENU DE LA FORMATION EN LIGNE ═══ -->
     <div class="modules-admin-card">
       <div class="modules-admin-heading">🎓 Contenu de la formation en ligne (vidéos & fichiers)</div>
