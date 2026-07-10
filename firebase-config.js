@@ -1,12 +1,12 @@
 // ════════════════ CONFIGURATION FIREBASE ════════════════
-// Connexion à ta base de données Firestore (projet: aichola-media-3602f)
+// Connexion à ta base de données Firestore (projet: aichola-media)
 const firebaseConfig = {
-  apiKey: "AIzaSyDCcJIdDxILnOgv-UPLc0Uco2x0h7FFP_k",
-  authDomain: "aichola-media-3602f.firebaseapp.com",
-  projectId: "aichola-media-3602f",
-  storageBucket: "aichola-media-3602f.firebasestorage.app",
-  messagingSenderId: "268440301834",
-  appId: "1:268440301834:web:ada706d94aab90a7454af3"
+  apiKey: "AIzaSyDpmObwVF3yWAn1IkRyTudQmbTx1U9gI6E",
+  authDomain: "aichola-media.firebaseapp.com",
+  projectId: "aichola-media",
+  storageBucket: "aichola-media.firebasestorage.app",
+  messagingSenderId: "579124743221",
+  appId: "1:579124743221:web:5fdacb365e3c7e770ff57c"
 };
 
 firebase.initializeApp(firebaseConfig);
