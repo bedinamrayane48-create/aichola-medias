@@ -963,7 +963,7 @@ function showSummaryPage(ref, dateObj) {
   showPage('summary');
 }
 
-// ════════════════ REÇU PDF (style officiel noir & blanc, sans tableaux) ════════════════
+// ════════════════ REÇU PDF (style ticket de caisse / pharmacie) ════════════════
 function generateReceiptPDF(u) {
   if (!u) return;
   if (!window.jspdf) {
@@ -974,13 +974,25 @@ function generateReceiptPDF(u) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const pageW = 210, pageH = 297;
   const black = [15, 15, 15];
-  const gray = [100, 100, 100];
-  const lightGray = [210, 210, 210];
-  const marginL = 26, marginR = pageW - 26;
+  const gray = [110, 110, 110];
+  const marginL = 22, marginR = pageW - 22;
+  const usableW = marginR - marginL;
 
   doc.setTextColor(...black);
 
-  // ─── Cadre décoratif extérieur (double liseré) ───
+  // Police monospace (comme une caisse enregistreuse) pour toute la partie "détail"
+  doc.setFont('courier', 'normal');
+  const CHAR_W = { 8: 1.632, 9: 1.836, 9.5: 1.938, 10: 2.04, 11: 2.244, 13: 2.652 };
+  function charsFor(size) { return Math.floor(usableW / CHAR_W[size]); }
+  function padRight(s, n) { s = String(s); return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length); }
+  function padLeft(s, n) { s = String(s); return s.length >= n ? s.slice(0, n) : ' '.repeat(n - s.length) + s; }
+  function dashLine(y, ch = '-', size = 9) {
+    doc.setFont('courier', 'normal'); doc.setFontSize(size); doc.setTextColor(...gray);
+    doc.text(ch.repeat(charsFor(size)), marginL, y);
+    doc.setTextColor(...black);
+  }
+
+  // ─── Cadre décoratif extérieur (bordure fine, style bloc-ticket) ───
   doc.setDrawColor(...black);
   doc.setLineWidth(0.8);
   doc.rect(8, 8, pageW - 16, pageH - 16);
@@ -994,160 +1006,173 @@ function generateReceiptPDF(u) {
   corner(14, 14, 1, 1); corner(pageW - 14, 14, -1, 1);
   corner(14, pageH - 14, 1, -1); corner(pageW - 14, pageH - 14, -1, -1);
 
-  // Ligne pointillée : libellé ....... valeur (aligné à droite)
-  function dottedLine(label, value, y, opts = {}) {
-    const fs = opts.fontSize || 10.5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(fs);
-    doc.setTextColor(...black);
-    doc.text(label, marginL, y);
-    doc.setFont(opts.valueFont || 'helvetica', opts.valueStyle || 'bold');
-    doc.setFontSize(opts.valueSize || fs);
-    const valW = doc.getTextWidth(value);
-    doc.text(value, marginR, y, { align: 'right' });
-    const labelW = doc.getTextWidth(label) + 3;
-    const dotsEnd = marginR - valW - 3;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(fs);
-    doc.setTextColor(...lightGray);
-    let dots = '';
-    const dotW = doc.getTextWidth('. ');
-    const spaceAvail = dotsEnd - (marginL + labelW);
-    const count = Math.max(0, Math.floor(spaceAvail / dotW));
-    for (let i = 0; i < count; i++) dots += '. ';
-    doc.text(dots, marginL + labelW, y);
-    doc.setTextColor(...black);
-  }
-
-  // ─── Sceau / monogramme ───
-  const cx = pageW / 2, cy = 26;
-  doc.setLineWidth(0.6); doc.circle(cx, cy, 11, 'S');
-  doc.setLineWidth(0.25); doc.circle(cx, cy, 9, 'S');
-  doc.setFont('times', 'bold'); doc.setFontSize(15);
-  doc.text('AM', cx, cy + 3.2, { align: 'center' });
+  // ─── Petits "trous" en pointillés façon bord de ticket détachable ───
+  doc.setFillColor(...black);
+  for (let xx = marginL; xx <= marginR; xx += 6) { doc.circle(xx, 20, 0.35, 'F'); }
 
   // ─── En-tête ───
-  let y = 46;
-  doc.setFont('times', 'bold'); doc.setFontSize(23);
+  let y = 32;
+  doc.setFont('courier', 'bold'); doc.setFontSize(19);
   doc.text('AÏCHOLA MÉDIA', pageW / 2, y, { align: 'center' });
   y += 6.5;
-  doc.setFont('times', 'italic'); doc.setFontSize(11); doc.setTextColor(...gray);
-  doc.text('Centre de Formation Professionnelle', pageW / 2, y, { align: 'center' });
+  doc.setFont('courier', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...gray);
+  doc.text('CENTRE DE FORMATION PROFESSIONNELLE', pageW / 2, y, { align: 'center' });
   y += 5;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-  doc.text('+228 71 12 65 93', pageW / 2, y, { align: 'center' });
+  doc.text('Lomé — Togo  ·  Tél : +228 71 12 65 93', pageW / 2, y, { align: 'center' });
+  doc.setTextColor(...black);
+  y += 8;
+  dashLine(y); y += 6;
 
+  doc.setFont('courier', 'bold'); doc.setFontSize(13);
+  doc.text('REÇU DE PAIEMENT', pageW / 2, y, { align: 'center' });
   y += 7;
-  doc.setDrawColor(...black); doc.setLineWidth(0.6);
-  doc.line(30, y, pageW - 30, y);
-  doc.setLineWidth(0.2);
-  doc.line(30, y + 1.2, pageW - 30, y + 1.2);
+  dashLine(y); y += 8;
 
-  y += 13;
-  doc.setTextColor(...black);
-  doc.setFont('times', 'bold'); doc.setFontSize(16);
-  doc.text('REÇU DE PAIEMENT OFFICIEL', pageW / 2, y, { align: 'center' });
-  y += 5;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...gray);
-  doc.text('Conservez ce document comme preuve de paiement', pageW / 2, y, { align: 'center' });
-  doc.setTextColor(...black);
+  // ─── Bloc infos (Date / N° reçu / Client) — colonnes monospace alignées ───
+  doc.setFontSize(9.5);
+  function infoRow(label, value) {
+    doc.setFont('courier', 'normal'); doc.setTextColor(...gray);
+    doc.text(padRight(label, 14), marginL, y);
+    doc.setFont('courier', 'bold'); doc.setTextColor(...black);
+    doc.text(String(value), marginL + 14 * CHAR_W[9.5], y);
+    y += 5.6;
+  }
+  infoRow('DATE', u.payDate || new Date().toLocaleDateString('fr-FR'));
+  infoRow('N° REÇU', u.payRef || 'N/A');
+  infoRow('CLIENT', `${u.prenom} ${u.nom}`);
+  infoRow('TÉLÉPHONE', u.tel);
+  infoRow('EMAIL', u.email);
+  infoRow('NIVEAU', u.niveau);
+  y += 3;
+  dashLine(y); y += 7;
 
-  // ─── Référence & Date ───
-  y += 14;
-  dottedLine('Référence du paiement', String(u.payRef || 'N/A'), y, { fontSize: 11 });
-  y += 10;
-  dottedLine('Date d\'émission', String(u.payDate || new Date().toLocaleDateString('fr-FR')), y, { fontSize: 11 });
+  // ─── Tableau des articles (façon ticket de caisse) ───
+  doc.setFont('courier', 'bold'); doc.setFontSize(9.5);
+  doc.text('DÉSIGNATION', marginL, y);
+  doc.text('QTÉ', marginL + 30 * CHAR_W[9.5], y);
+  doc.text('P.U (F CFA)', marginL + 40 * CHAR_W[9.5], y);
+  doc.text('MONTANT', marginR, y, { align: 'right' });
+  y += 4;
+  dashLine(y, '.'); y += 7;
 
-  // ─── Section identité ───
-  y += 16;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
-  doc.text("IDENTITÉ DE L'ÉTUDIANT", marginL, y);
-  doc.setLineWidth(0.3);
-  doc.line(marginL, y + 2.5, marginR, y + 2.5);
-  y += 13;
-  doc.setFont('times', 'bold'); doc.setFontSize(15);
-  doc.text(`${u.prenom} ${u.nom}`, marginL, y);
-  y += 12;
-  dottedLine('Adresse e-mail', String(u.email), y); y += 10;
-  dottedLine('Numéro de téléphone', String(u.tel), y); y += 10;
-  dottedLine('Niveau / Formation', String(u.niveau), y); y += 10;
-  dottedLine('Adresse', String(u.adresse), y);
-
-  // ─── Section paiement ───
-  y += 16;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
-  doc.text('DÉTAIL DU PAIEMENT', marginL, y);
-  doc.setLineWidth(0.3);
-  doc.line(marginL, y + 2.5, marginR, y + 2.5);
-  y += 13;
-
-  dottedLine("Frais d'inscription", '10 000 F CFA', y, { fontSize: 11, valueFont: 'times', valueSize: 13 });
-  y += 7;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
-  doc.text(`Réf : ${u.payRef || 'N/A'}   ·   Mode : ${u.payMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}   ·   Statut : confirmé`, marginL, y);
-  doc.setTextColor(...black);
-  y += 12;
-
-  if (u.payFormation) {
-    dottedLine('Frais de formation', '100 000 F CFA', y, { fontSize: 11, valueFont: 'times', valueSize: 13 });
-    y += 7;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
-    doc.text(`Réf : ${u.payFormationRef || 'N/A'}   ·   Mode : ${u.payFormationMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}   ·   Statut : confirmé`, marginL, y);
+  function itemRow(name, unitPrice) {
+    doc.setFont('courier', 'normal'); doc.setFontSize(9.5); doc.setTextColor(...black);
+    doc.text(name, marginL, y);
+    doc.text('1', marginL + 31.5 * CHAR_W[9.5], y);
+    doc.text(unitPrice.toLocaleString('fr-FR'), marginL + 42 * CHAR_W[9.5], y);
+    doc.setFont('courier', 'bold');
+    doc.text(unitPrice.toLocaleString('fr-FR') + ' FCFA', marginR, y, { align: 'right' });
+    y += 6.2;
+    doc.setFont('courier', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+    doc.text(`   Réf: N/A`.replace('N/A', 'inscription' === name ? '' : ''), marginL, y); // placeholder removed below
+    y -= 0; // no-op kept for structure clarity
     doc.setTextColor(...black);
-    y += 12;
-
-    doc.setLineWidth(0.6);
-    doc.line(marginL, y, marginR, y);
-    y += 9;
-    dottedLine('TOTAL GÉNÉRAL PAYÉ', '110 000 F CFA', y, { fontSize: 12.5, valueFont: 'times', valueSize: 16 });
-    y += 3;
-    doc.setLineWidth(0.6);
-    doc.line(marginL, y, marginR, y);
-    y += 12;
-  } else {
-    y += 4;
-    doc.setLineWidth(0.3);
-    doc.line(marginL, y, marginR, y);
-    y += 12;
   }
 
+  // Ligne article : Inscription
+  doc.setFont('courier', 'normal'); doc.setFontSize(9.5);
+  doc.text("Frais d'inscription", marginL, y);
+  doc.text('1', marginL + 31.5 * CHAR_W[9.5], y);
+  doc.text((10000).toLocaleString('fr-FR'), marginL + 42 * CHAR_W[9.5], y);
+  doc.setFont('courier', 'bold');
+  doc.text('10 000 FCFA', marginR, y, { align: 'right' });
+  y += 5;
+  doc.setFont('courier', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+  doc.text(`Réf : ${u.payRef || 'N/A'}  ·  Mode : ${u.payMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}`, marginL, y);
+  doc.setTextColor(...black);
+  y += 8;
+
+  let total = 10000;
+  if (u.payFormation) {
+    doc.setFont('courier', 'normal'); doc.setFontSize(9.5);
+    doc.text('Frais de formation', marginL, y);
+    doc.text('1', marginL + 31.5 * CHAR_W[9.5], y);
+    doc.text((100000).toLocaleString('fr-FR'), marginL + 42 * CHAR_W[9.5], y);
+    doc.setFont('courier', 'bold');
+    doc.text('100 000 FCFA', marginR, y, { align: 'right' });
+    y += 5;
+    doc.setFont('courier', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+    doc.text(`Réf : ${u.payFormationRef || 'N/A'}  ·  Mode : ${u.payFormationMethod === 'moov' ? 'MOOV MONEY' : 'YAS TOGO'}`, marginL, y);
+    doc.setTextColor(...black);
+    y += 8;
+    total = 110000;
+  }
+
+  dashLine(y); y += 8;
+
+  // ─── Total ───
+  doc.setFont('courier', 'bold'); doc.setFontSize(9.5);
+  doc.text(padRight('SOUS-TOTAL', 30), marginL, y);
+  doc.text(total.toLocaleString('fr-FR') + ' FCFA', marginR, y, { align: 'right' });
+  y += 6;
+  doc.setFont('courier', 'normal'); doc.setFontSize(9);
+  doc.text(padRight('REMISE', 30), marginL, y);
+  doc.text('0 FCFA', marginR, y, { align: 'right' });
+  y += 7;
+  dashLine(y, '='); y += 8;
+
+  doc.setFont('courier', 'bold'); doc.setFontSize(13);
+  doc.text('TOTAL PAYÉ', marginL, y);
+  doc.text(total.toLocaleString('fr-FR') + ' FCFA', marginR, y, { align: 'right' });
+  y += 9;
+  dashLine(y, '='); y += 9;
+
   // ─── Statut ───
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-  doc.text("✓  PAIEMENT VALIDÉ PAR L'ADMINISTRATEUR", pageW / 2, y, { align: 'center' });
+  doc.setFont('courier', 'bold'); doc.setFontSize(9.5);
+  doc.text("*** PAIEMENT VALIDÉ PAR L'ADMINISTRATEUR ***", pageW / 2, y, { align: 'center' });
+  y += 9;
+  dashLine(y); y += 9;
+
+  // ─── Mention légale ───
+  doc.setFont('courier', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
+  const mention = 'Ce reçu fait foi de paiement. À conserver précieusement. Toute contestation doit être signalée sous 7 jours à compter de la date ci-dessus.';
+  const mentionLines = doc.splitTextToSize(mention, usableW);
+  doc.text(mentionLines, pageW / 2, y, { align: 'center' });
+  const mentionH = doc.getTextDimensions(mentionLines).h;
+  doc.setTextColor(...black);
+  y += mentionH + 10;
+
+  // ─── Signature ───
+  doc.setFont('courier', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...gray);
+  doc.text('Fait à Lomé, le ' + new Date().toLocaleDateString('fr-FR'), marginL, y);
+  doc.setDrawColor(...black); doc.setLineWidth(0.3);
+  doc.line(marginR - 50, y + 2.5, marginR, y + 2.5);
+  doc.setFont('courier', 'normal'); doc.setFontSize(8);
+  doc.text('Signature / Cachet', marginR - 25, y + 7, { align: 'center' });
   y += 14;
 
-  // ─── Mention légale (comble l'espace, apporte un ton officiel) ───
-  doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(...gray);
-  const mention = "Le présent reçu fait foi de paiement auprès du Centre de Formation Professionnelle AÏCHOLA MÉDIA. Il doit être conservé par l'étudiant(e) pour toute réclamation ou vérification ultérieure. Toute contestation doit être signalée dans un délai de sept (7) jours à compter de la date d'émission mentionnée ci-dessus.";
-  const mentionLines = doc.splitTextToSize(mention, marginR - marginL);
-  doc.text(mentionLines, pageW / 2, y, { align: 'center' });
-  doc.setTextColor(...black);
+  dashLine(y); y += 7;
 
-  // ─── Tampon "PAYÉ" en filigrane ───
-  doc.setTextColor(...lightGray);
-  doc.setFont('times', 'bold'); doc.setFontSize(50);
-  doc.text('PAYÉ', pageW / 2, pageH / 2 + 40, { align: 'center', angle: 22 });
-  doc.setTextColor(...black);
-
-  // ─── Signature / cachet ───
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...gray);
-  doc.text('Fait à Lomé, le ' + new Date().toLocaleDateString('fr-FR'), marginL, 250);
-  doc.setDrawColor(...black); doc.setLineWidth(0.3);
-  doc.line(marginR - 50, 253, marginR, 253);
-  doc.text('Signature / Cachet', marginR - 25, 258, { align: 'center' });
+  // ─── Code-barres décoratif (façon ticket de caisse) ───
+  const barcodeStr = (u.payRef || '0000000000').replace(/\D/g, '').padEnd(12, '0').slice(0, 12);
+  let bx = pageW / 2 - 34;
+  doc.setFillColor(...black);
+  for (let i = 0; i < barcodeStr.length; i++) {
+    const digit = parseInt(barcodeStr[i], 10);
+    const w = 0.5 + (digit % 3) * 0.5;
+    doc.rect(bx, y, w, 12, 'F');
+    bx += w + 1.2;
+  }
+  y += 15;
+  doc.setFont('courier', 'normal'); doc.setFontSize(8); doc.setTextColor(...gray);
+  doc.text(barcodeStr, pageW / 2, y, { align: 'center' });
+  y += 8;
 
   // ─── Pied de page ───
-  doc.setDrawColor(...black); doc.setLineWidth(0.3);
-  doc.line(marginL, 268, marginR, 268);
-  doc.setFont('times', 'italic'); doc.setFontSize(9); doc.setTextColor(...gray);
-  doc.text(`Merci pour votre confiance, ${u.prenom}.`, pageW / 2, 274, { align: 'center' });
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-  doc.text('AÏCHOLA MÉDIA — Centre de Formation Professionnelle — +228 71 12 65 93', pageW / 2, 280, { align: 'center' });
+  doc.setFont('courier', 'bold'); doc.setFontSize(9); doc.setTextColor(...black);
+  doc.text(`MERCI POUR VOTRE CONFIANCE, ${u.prenom.toUpperCase()} !`, pageW / 2, y, { align: 'center' });
+  y += 5.5;
+  doc.setFont('courier', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...gray);
+  doc.text('AÏCHOLA MÉDIA — Centre de Formation Professionnelle', pageW / 2, y, { align: 'center' });
+  y += 4.5;
+  doc.text('Document généré électroniquement — sans signature manuscrite requise', pageW / 2, y, { align: 'center' });
 
   const fileName = `Recu-${u.prenom}-${u.nom}-AicholaMedia.pdf`.replace(/\s+/g, '-');
   doc.save(fileName);
   showToast('📥', 'Reçu téléchargé !', 'Le fichier PDF a été enregistré — vous pouvez aussi l\'imprimer.');
 }
+
+
 
 
 function downloadReceipt() {
