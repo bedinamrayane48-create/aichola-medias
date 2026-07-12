@@ -1059,7 +1059,7 @@ async function finalizePaydunyaPayment(token, type, userId) {
   if (currentUser && currentUser.id === userId) {
     currentUser = users[idx];
     showToast('✅', 'Paiement confirmé !', 'Votre paiement a été vérifié automatiquement.');
-    setTimeout(() => { if (typeof loadStudentDash === 'function') loadStudentDash(); }, 600);
+    setTimeout(() => { if (typeof loadStudentDash === 'function') loadStudentDash(currentUser); }, 600);
   } else {
     showToast('✅', 'Paiement confirmé !', 'Reconnectez-vous pour voir votre accès mis à jour.');
   }
