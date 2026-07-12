@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<!-- Génération de reçus en PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 </head>
 <body>
@@ -256,6 +258,15 @@
         </div>
         <div class="pay-amount-icon">💰</div>
       </div>
+
+      <!-- ═══ PAIEMENT EN LIGNE AUTOMATIQUE (PayDunya) ═══ -->
+      <div id="paydunya-box" style="background:linear-gradient(135deg,rgba(212,175,55,0.12),rgba(212,175,55,0.05)); border:1px solid rgba(212,175,55,0.3); border-radius:16px; padding:20px; margin-bottom:18px; text-align:center;">
+        <div style="font-size:12px; font-weight:800; letter-spacing:1.5px; color:#d4af37; text-transform:uppercase; margin-bottom:6px;">✨ Paiement instantané</div>
+        <div style="font-size:12px; color:rgba(255,255,255,0.55); margin-bottom:14px;">Carte bancaire, Mobile Money — confirmation automatique, sans attendre l'admin</div>
+        <button class="btn-primary" id="btn-pay-online" onclick="payOnlinePaydunya()" style="width:100%;">💳 PAYER EN LIGNE MAINTENANT</button>
+        <div id="paydunya-status" style="font-size:11px; color:rgba(255,255,255,0.4); margin-top:10px;"></div>
+      </div>
+      <div style="text-align:center; font-size:10px; color:rgba(255,255,255,0.25); letter-spacing:1px; text-transform:uppercase; margin-bottom:18px;">— ou paiement manuel ci-dessous —</div>
 
       <!-- Choix méthode -->
       <div style="font-size:11px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; font-family:'Montserrat',sans-serif; font-weight:700;" id="t-choose-method">Choisir la méthode de paiement</div>
