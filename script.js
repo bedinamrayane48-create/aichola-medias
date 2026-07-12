@@ -600,14 +600,21 @@ async function doLogin() {
   if (enteredHash !== user.passHash) { showError(errEl, t('err-login')); return; }
   currentUser = user;
   showToast('✅', t('toast-login-title'), t('toast-login-msg'));
+
+  // Filet de sécurité : si un paiement PayDunya était resté "en attente"
+  // (onglet fermé trop tôt, popup bloqué sur mobile, etc.), on le vérifie
+  // silencieusement maintenant que la personne s'est reconnectée.
+  const recovered = await checkPendingPaydunyaForUser(user);
+  if (recovered) { currentUser = recovered; }
+
   // Si l'inscription n'est pas encore payée, rediriger vers paiement
-  if (!user.payInscription) {
+  if (!currentUser.payInscription) {
     openPaymentPage('inscription');
-  } else if (!user.activated) {
+  } else if (!currentUser.activated) {
     // Paiement fait mais pas encore activé par l'admin
-    showWaitingPage(user);
+    showWaitingPage(currentUser);
   } else {
-    loadStudentDash(user);
+    loadStudentDash(currentUser);
   }
 }
 
@@ -958,6 +965,16 @@ async function payOnlinePaydunya() {
     const data = await res.json();
 
     if (data.success && data.paymentUrl) {
+      // On sauvegarde TOUJOURS le paiement en attente (même si le popup
+      // s'ouvre bien) : sur mobile, l'onglet de surveillance peut être fermé
+      // ou perdu avant la fin — ce filet permet de récupérer le paiement à
+      // la prochaine connexion, quoi qu'il arrive.
+      localStorage.setItem('aichola_pending_paydunya', JSON.stringify({
+        token: data.token,
+        type: payContext.type,
+        userId: currentUser.id,
+      }));
+
       // On ouvre PayDunya dans un NOUVEL ONGLET — on garde le nôtre ouvert
       // pour surveiller le paiement automatiquement, sans dépendre d'un
       // quelconque bouton "retour" côté PayDunya.
@@ -970,11 +987,6 @@ async function payOnlinePaydunya() {
       } else {
         // Le navigateur a bloqué l'ouverture du nouvel onglet → on retombe
         // sur une redirection classique en pleine page (avec retour par URL).
-        localStorage.setItem('aichola_pending_paydunya', JSON.stringify({
-          token: data.token,
-          type: payContext.type,
-          userId: currentUser.id,
-        }));
         window.location.href = data.paymentUrl;
       }
     } else {
@@ -1035,7 +1047,7 @@ function pollPaydunyaStatus(token, type, userId, btn, statusEl) {
 async function finalizePaydunyaPayment(token, type, userId) {
   const users = getUsers();
   const idx = users.findIndex(u => u.id === userId);
-  if (idx === -1) return;
+  if (idx === -1) return null;
   const now = new Date();
   const ref = 'PD-' + token.slice(0, 10).toUpperCase();
 
@@ -1056,12 +1068,48 @@ async function finalizePaydunyaPayment(token, type, userId) {
   }
   saveUsers(users);
 
+  // Nettoie le token en attente : ce paiement est maintenant réglé
+  try {
+    const pendingRaw = localStorage.getItem('aichola_pending_paydunya');
+    if (pendingRaw) {
+      const pending = JSON.parse(pendingRaw);
+      if (pending.token === token) localStorage.removeItem('aichola_pending_paydunya');
+    }
+  } catch (e) {}
+
   if (currentUser && currentUser.id === userId) {
     currentUser = users[idx];
     showToast('✅', 'Paiement confirmé !', 'Votre paiement a été vérifié automatiquement.');
     setTimeout(() => { if (typeof loadStudentDash === 'function') loadStudentDash(currentUser); }, 600);
   } else {
     showToast('✅', 'Paiement confirmé !', 'Reconnectez-vous pour voir votre accès mis à jour.');
+  }
+  return users[idx];
+}
+
+// Appelée juste après une connexion réussie : vérifie s'il existe un paiement
+// PayDunya resté "en suspens" pour CET utilisateur (ex : onglet fermé trop tôt
+// sur mobile), et le confirme silencieusement si c'est le cas.
+async function checkPendingPaydunyaForUser(user) {
+  try {
+    const pendingRaw = localStorage.getItem('aichola_pending_paydunya');
+    if (!pendingRaw) return null;
+    const pending = JSON.parse(pendingRaw);
+    if (pending.userId !== user.id) return null;
+
+    const res = await fetch(PAYDUNYA_WORKER_URL + '/confirm?token=' + encodeURIComponent(pending.token));
+    const data = await res.json();
+    if (data.success && data.status === 'completed') {
+      return await finalizePaydunyaPayment(pending.token, pending.type, pending.userId);
+    }
+    if (data.status === 'cancelled' || data.status === 'failed') {
+      localStorage.removeItem('aichola_pending_paydunya');
+    }
+    // Si "pending", on laisse le token en attente pour la prochaine fois
+    return null;
+  } catch (e) {
+    console.error(e);
+    return null;
   }
 }
 
