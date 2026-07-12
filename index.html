@@ -266,6 +266,9 @@
         <button class="btn-primary" id="btn-pay-online" onclick="payOnlinePaydunya()" style="width:100%;">💳 PAYER EN LIGNE MAINTENANT</button>
         <div id="paydunya-status" style="font-size:11px; color:rgba(255,255,255,0.4); margin-top:10px;"></div>
       </div>
+      <!-- Ancien système manuel (USSD) — conservé dans le code mais masqué,
+           désormais tout passe par le paiement en ligne PayDunya ci-dessus -->
+      <div id="manual-payment-legacy" style="display:none;">
       <div style="text-align:center; font-size:10px; color:rgba(255,255,255,0.25); letter-spacing:1px; text-transform:uppercase; margin-bottom:18px;">— ou paiement manuel ci-dessous —</div>
 
       <!-- Choix méthode -->
@@ -382,6 +385,7 @@
           📲 ENVOYER LA CAPTURE SUR WHATSAPP
         </a>
       </div>
+      </div><!-- /manual-payment-legacy -->
 
     </div><!-- /pay-main -->
 
