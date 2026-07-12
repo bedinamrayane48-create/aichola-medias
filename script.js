@@ -1,5 +1,7 @@
 // ════════════════ DATA ════════════════
 const STORE_KEY = 'aichola_users';
+// Backend de paiement (Cloudflare Worker) — gère PayDunya en toute sécurité
+const PAYDUNYA_WORKER_URL = 'https://aichola-paydunya.rayanebedinam35.workers.dev';
 // Identifiants admin PAR DÉFAUT (utilisés une seule fois, à la toute première
 // utilisation du site, pour initialiser la config dans Firestore). Une fois la
 // config créée en base, c'est ELLE qui fait foi — modifiable depuis le panneau
@@ -931,6 +933,117 @@ function confirmPayDone() {
   setTimeout(() => showWaitingPage(currentUser), 400);
 }
 
+// ════════════════ PAIEMENT EN LIGNE (PayDunya via Cloudflare Worker) ════════════════
+async function payOnlinePaydunya() {
+  if (!currentUser) { showToast('⚠️', 'Erreur', 'Veuillez vous reconnecter.'); return; }
+  const btn = document.getElementById('btn-pay-online');
+  const statusEl = document.getElementById('paydunya-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Connexion en cours...';
+  statusEl.textContent = '';
+
+  try {
+    const res = await fetch(PAYDUNYA_WORKER_URL + '/create-invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: payContext.type,
+        prenom: currentUser.prenom,
+        nom: currentUser.nom,
+        email: currentUser.email,
+        tel: currentUser.tel,
+      }),
+    });
+    const data = await res.json();
+
+    if (data.success && data.paymentUrl) {
+      // On garde le token + type en attente, pour le retrouver au retour de PayDunya
+      localStorage.setItem('aichola_pending_paydunya', JSON.stringify({
+        token: data.token,
+        type: payContext.type,
+        userId: currentUser.id,
+      }));
+      window.location.href = data.paymentUrl; // redirection vers la vraie page de paiement
+    } else {
+      statusEl.style.color = '#e74c3c';
+      statusEl.textContent = '⚠ ' + (data.error || 'Impossible de créer le paiement. Réessayez.');
+      btn.disabled = false;
+      btn.textContent = '💳 PAYER EN LIGNE MAINTENANT';
+    }
+  } catch (err) {
+    console.error(err);
+    statusEl.style.color = '#e74c3c';
+    statusEl.textContent = '⚠ Erreur de connexion. Vérifiez votre internet.';
+    btn.disabled = false;
+    btn.textContent = '💳 PAYER EN LIGNE MAINTENANT';
+  }
+}
+
+// Appelée au chargement de la page : vérifie si on revient d'un paiement PayDunya
+async function handlePaydunyaReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const paiementStatus = params.get('paiement');
+  if (!paiementStatus) return; // pas un retour PayDunya, rien à faire
+
+  const pendingRaw = localStorage.getItem('aichola_pending_paydunya');
+  // Nettoyer l'URL tout de suite (évite une double vérification si on rafraîchit)
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  if (paiementStatus === 'annule') {
+    localStorage.removeItem('aichola_pending_paydunya');
+    showToast('ℹ️', 'Paiement annulé', "Vous pouvez réessayer quand vous voulez.");
+    return;
+  }
+
+  if (paiementStatus !== 'succes' || !pendingRaw) return;
+
+  let pending;
+  try { pending = JSON.parse(pendingRaw); } catch (e) { return; }
+  localStorage.removeItem('aichola_pending_paydunya');
+
+  try {
+    const res = await fetch(PAYDUNYA_WORKER_URL + '/confirm?token=' + encodeURIComponent(pending.token));
+    const data = await res.json();
+
+    if (data.success && data.status === 'completed') {
+      const users = getUsers();
+      const idx = users.findIndex(u => u.id === pending.userId);
+      if (idx === -1) return;
+      const now = new Date();
+      const ref = 'PD-' + pending.token.slice(0, 10).toUpperCase();
+
+      if (pending.type === 'inscription') {
+        users[idx].payInscription = true;
+        users[idx].payMethod = 'paydunya';
+        users[idx].payRef = ref;
+        users[idx].payDate = now.toLocaleDateString('fr-FR');
+        users[idx].activated = true; // paiement vérifié par API → activation immédiate
+        users[idx].paymentSent = true;
+      } else {
+        users[idx].payFormation = true;
+        users[idx].payFormationMethod = 'paydunya';
+        users[idx].payFormationRef = ref;
+        users[idx].payFormationDate = now.toLocaleDateString('fr-FR');
+        users[idx].formationActivated = true;
+        users[idx].payFormationSent = true;
+      }
+      saveUsers(users);
+      if (currentUser && currentUser.id === pending.userId) {
+        currentUser = users[idx];
+        showToast('✅', 'Paiement confirmé !', 'Votre paiement a été vérifié automatiquement.');
+        setTimeout(() => { if (typeof loadStudentDash === 'function') loadStudentDash(); }, 600);
+      } else {
+        showToast('✅', 'Paiement confirmé !', 'Reconnectez-vous pour voir votre accès mis à jour.');
+      }
+    } else {
+      showToast('⚠️', 'Paiement non confirmé', "Le statut du paiement n'a pas pu être vérifié. Contactez l'administrateur si vous avez payé.");
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('⚠️', 'Erreur de vérification', 'Contactez l\'administrateur avec votre référence si le paiement a bien été effectué.');
+  }
+}
+
 function showSummaryPage(ref, dateObj) {
   const u = currentUser;
   const method = selectedMethod || 'yas';
@@ -1774,7 +1887,11 @@ window.addEventListener('load', () => {
     setTimeout(() => { try { el.parentNode.removeChild(el); } catch(e){} }, 600);
   }
   (function waitForData() {
-    if (firestoreReady && adminConfigReady) { setTimeout(hideLoading, 400); return; }
+    if (firestoreReady && adminConfigReady) {
+      setTimeout(hideLoading, 400);
+      handlePaydunyaReturn();
+      return;
+    }
     setTimeout(waitForData, 150);
   })();
   setTimeout(hideLoading, 5000); // filet de sécurité si pas de connexion internet
